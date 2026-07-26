@@ -1,0 +1,71 @@
+# Architecture decisions
+
+This document tracks the key technical decisions for the football AI analyst project, and the reasoning behind each one.
+
+## Database: PostgreSQL over NoSQL
+
+**Decision:** Use PostgreSQL (relational) rather than a NoSQL store like MongoDB.
+
+**Reasoning:** Football data has inherent relational structure - a match belongs to two teams, a team has many players, a player has many stat lines across matches - which maps cleanly onto foreign-key relationships. XGBoost training also needs flat, tabular rows, which SQL provides directly via a query; NoSQL would require an extra flattening step. Agent questions (season averages, head-to-head history) are natural JOIN + WHERE queries. Also diversifies the portfolio alongside an existing MongoDB-based project.
+
+**Trade-off accepted:** Requires upfront schema design before data can be inserted, unlike NoSQL's flexible-schema approach.
+
+---
+
+## Scraping: Scrapy over BeautifulSoup
+
+**Decision:** Attempt Scrapy first; fall back to BeautifulSoup if Scrapy proves too difficult within a reasonable time-box.
+
+**Reasoning:** FBref and Understat don't offer an official API, so data must be scraped directly from page HTML. Scrapy is a more mature, industry-recognized scraping framework, better suited to scaling across multiple sites. BeautifulSoup is simpler and faster to get basic parsing working if Scrapy's learning curve becomes a blocker.
+
+**Trade-off accepted:** Time-boxed evaluation (roughly 1-2 days) to avoid getting stuck on tooling instead of the actual data logic.
+
+---
+
+## Orchestration: Airflow over Prefect
+
+**Decision:** Attempt Airflow first; fall back to Prefect if Airflow's setup/infra overhead becomes a blocker.
+
+**Reasoning:** New match data needs to be scraped/pulled on a recurring daily schedule and inserted into the database. Airflow is the longer-standing, more widely recognized industry-standard orchestration tool. Prefect is lighter-weight and easier to set up for a solo, single-pipeline project, making it a reasonable fallback if Airflow's infra requirements (scheduler, webserver, metadata DB) prove too heavy.
+
+**Trade-off accepted:** Same time-boxed evaluation approach as the scraping decision, to avoid extended setup struggles derailing progress.
+
+---
+
+## Data sources: scraping + API + live search
+
+**Decision:** Use FBref/Understat (scraped) for advanced stats, API-Football (free tier) for structured fixtures/scores, and Serp API as a runtime fallback for information not yet in the database.
+
+**Reasoning:** No single free source covers both rich advanced stats and structured fixture/score data. FBref/Understat provide the granular stats (tackles, xG/xA, progressive passes) the analyst feature depends on, which API-Football's free tier doesn't cover as deeply. API-Football provides clean JSON without needing HTML parsing where scraping isn't necessary. Serp API only runs at query time (unlike the other two, which only run during scheduled ingestion), covering things like breaking injury news not yet ingested.
+
+**Trade-off accepted:** Three separate data sources to maintain and reconcile (e.g. matching player names/IDs across sources) rather than one unified source.
+
+---
+
+## Machine learning approach: no ML in V1, XGBoost in V2
+
+**Decision:** V1 (player/match performance analyst) uses no trained model - the LLM reasons directly over retrieved stats. V2 (match outcome prediction) uses an XGBoost 3-class classifier (home win / draw / away win).
+
+**Reasoning:** V1's task is interpreting known, already-occurred stats - retrieval plus LLM judgment is sufficient, and forcing a trained model into that step would add complexity without adding accuracy. V2's task (predicting a future, unknown outcome) is a genuine supervised learning problem, which XGBoost handles well for structured tabular features (recent form, head-to-head, home advantage, player availability).
+
+**Trade-off accepted:** Two different technical approaches within one project, worth explaining clearly so it doesn't read as an inconsistency.
+
+---
+
+## Agent framework: hand-rolled tool loop for V1, LangGraph for V2
+
+**Decision:** Build V1's tool-calling loop directly against the raw Gemini/OpenRouter API. Introduce LangGraph specifically for V2, where reasoning branches conditionally (e.g. check form -> check head-to-head -> check injuries -> decide).
+
+**Reasoning:** V1's flow (LLM picks 1-3 tools, gets results, responds) is simple enough to hand-roll, which also demonstrates a clear understanding of the underlying mechanics rather than relying on an abstraction from the start. V2's genuinely branching logic is the specific problem LangGraph's state-graph model is designed to simplify.
+
+**Trade-off accepted:** Two different agent implementations within the same project; introducing a framework partway through is a deliberate choice, not an inconsistency.
+
+---
+
+## Deferred: RAG caching layer for Serp API results
+
+**Decision:** Not implemented now; revisit after V1 and V2 are functional, as a stretch goal.
+
+**Reasoning:** Mentor asked whether RAG could reduce redundant Serp API calls by caching prior search results. It's technically sound (would use pgvector alongside the existing Postgres database, with embeddings and a TTL/freshness check to avoid serving stale cached results), but Serp is a fallback tool, not the primary data path - most queries are already answered from the database. The added complexity (vector store, embeddings, freshness handling) isn't justified yet for a tool that's called infrequently.
+
+**Trade-off accepted:** None currently, as long as the Serp API call stays isolated in its own tool function - this keeps the door open to add the cache layer later as a contained, low-risk addition rather than a refactor.
