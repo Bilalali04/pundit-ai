@@ -1,6 +1,14 @@
-# Architecture decisions
+# Pundit AI - Architecture decisions
 
-This document tracks the key technical decisions for the football AI analyst project, and the reasoning behind each one.
+## Project context
+
+This project combines a personal interest in football with a portfolio goal of demonstrating agentic AI architecture, data engineering, and applied machine learning together in one system, rather than each in isolation. Watching and following matches regularly made the idea of an AI that can reason about performance and outcomes the same way a fan or analyst would feel like a natural fit, rather than an arbitrary dataset choice.
+
+The ultimate goal is for the AI to form its own opinion from the underlying stats when a user asks a question, rather than just reporting numbers back. Asking "did Marquinhos play well yesterday" should get a judgment (yes, with specific reasoning drawn from his stats and the match context), not a stat dump. It's structured in two phases: V1 is an AI analyst that forms this kind of opinion on player and match performance; V2 adds a trained model to predict match outcomes using team form, head-to-head history, and player availability. The project is mentor-guided, with biweekly check-ins to review architecture and progress; this document exists specifically to keep the reasoning behind each technical decision visible, separate from the codebase itself.
+
+---
+
+This document tracks the key technical decisions for Pundit AI, and the reasoning behind each one.
 
 ## Database: PostgreSQL over NoSQL
 
