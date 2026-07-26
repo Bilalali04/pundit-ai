@@ -1,5 +1,5 @@
 -- ============================================================
--- Football AI Analyst - PostgreSQL Schema
+-- Pundit AI - PostgreSQL Schema
 -- ============================================================
 -- Design notes:
 -- - Normalized relational structure: leagues -> teams -> players,
