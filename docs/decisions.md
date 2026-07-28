@@ -20,13 +20,15 @@ This document tracks the key technical decisions for Pundit AI, and the reasonin
 
 ---
 
-## Scraping: Scrapy over BeautifulSoup
+## Scraping: soccerdata library over hand-rolled Scrapy/BeautifulSoup
 
-**Decision:** Attempt Scrapy first; fall back to BeautifulSoup if Scrapy proves too difficult within a reasonable time-box.
+**Decision:** Use the `soccerdata` Python library (which wraps FBref/Understat scraping internally) rather than writing a custom Scrapy or BeautifulSoup spider.
 
-**Reasoning:** FBref and Understat don't offer an official API, so data must be scraped directly from page HTML. Scrapy is a more mature, industry-recognized scraping framework, better suited to scaling across multiple sites. BeautifulSoup is simpler and faster to get basic parsing working if Scrapy's learning curve becomes a blocker.
+**Reasoning:** A direct `requests` call to FBref returns a Cloudflare Turnstile JS challenge page instead of real content - confirmed by testing against a real match URL. This isn't a simple rate-limit or User-Agent issue; it's a JS-based bot challenge that a plain HTTP request (which is what both Scrapy and BeautifulSoup fundamentally use) cannot pass, and attempting to defeat it directly would cross into bot-detection bypass, which isn't something to build around. `soccerdata` is an actively maintained, widely used library that already handles FBref's scraping quirks, so it was tested directly as an alternative to hand-rolling a spider from scratch.
 
-**Trade-off accepted:** Time-boxed evaluation (roughly 1-2 days) to avoid getting stuck on tooling instead of the actual data logic.
+A second candidate, `fbrefdata` (a fork of `soccerdata` aiming for broader competition coverage), was also evaluated but ruled out: it depends on `undetected_chromedriver`, which imports `distutils` - a standard library module removed starting in Python 3.12 (not just 3.13, as initially assumed). This makes `fbrefdata` unusable on any current Python version without deeper dependency workarounds, and signals the library isn't being actively maintained to track modern Python. Confirmed by testing on both Python 3.13 and 3.12 venvs - same failure on both, since the underlying stdlib removal applies to both versions.
+
+**Trade-off accepted:** `soccerdata`'s built-in league coverage is the top-5 European domestic leagues (Premier League, La Liga, Ligue 1, Bundesliga, Serie A) plus major international tournaments (Euros, World Cup, Women's World Cup) - it does not include Champions League or Europa League. V1 scope is limited to these supported leagues for full advanced-stats analysis. Champions League/Europa League matches can still get basic coverage (fixtures, scores, lineups) via API-Football, just without the advanced stats (tackles, xG/xA, progressive passes) that power the deeper analyst commentary. Custom league addition for Champions League is technically possible in `soccerdata` but its own docs warn this may not scrape correctly, so it's a possible future experiment, not core scope.
 
 ---
 
@@ -40,13 +42,13 @@ This document tracks the key technical decisions for Pundit AI, and the reasonin
 
 ---
 
-## Data sources: scraping + API + live search
+## Data sources: soccerdata + API + live search
 
-**Decision:** Use FBref/Understat (scraped) for advanced stats, API-Football (free tier) for structured fixtures/scores, and Serp API as a runtime fallback for information not yet in the database.
+**Decision:** Use `soccerdata` (which pulls from FBref/Understat internally) for advanced stats on top-5 league matches, API-Football (free tier) for structured fixtures/scores across all competitions including Champions League/Europa League, and Serp API as a runtime fallback for information not yet in the database.
 
-**Reasoning:** No single free source covers both rich advanced stats and structured fixture/score data. FBref/Understat provide the granular stats (tackles, xG/xA, progressive passes) the analyst feature depends on, which API-Football's free tier doesn't cover as deeply. API-Football provides clean JSON without needing HTML parsing where scraping isn't necessary. Serp API only runs at query time (unlike the other two, which only run during scheduled ingestion), covering things like breaking injury news not yet ingested.
+**Reasoning:** No single free source covers both rich advanced stats and structured fixture/score data for every competition. `soccerdata` provides the granular stats (tackles, xG/xA, progressive passes) the analyst feature depends on, for its supported leagues. API-Football provides clean JSON without needing HTML parsing, and covers competitions `soccerdata` doesn't (like Champions League), just without the same stat depth. Serp API only runs at query time (unlike the other two, which only run during scheduled ingestion), covering things like breaking injury news not yet ingested.
 
-**Trade-off accepted:** Three separate data sources to maintain and reconcile (e.g. matching player names/IDs across sources) rather than one unified source.
+**Trade-off accepted:** Three separate data sources to maintain and reconcile (e.g. matching player names/IDs across sources) rather than one unified source. Additionally, stat depth is uneven across competitions - full advanced-stats analysis for top-5 leagues, basic-only for Champions League/Europa League.
 
 ---
 
