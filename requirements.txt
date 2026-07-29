@@ -6,3 +6,4 @@ psycopg2-binary
 pandas
 python-dotenv
 soccerdata
+google-genai
