@@ -44,7 +44,7 @@ A second candidate, `fbrefdata` (a fork of `soccerdata` aiming for broader compe
 
 ## Data sources: merged soccerdata (FBref) + API-Football, after extensive evaluation
 
-**Decision:** Merge two legitimate sources at the column level rather than relying on one: `soccerdata` (FBref) for goals, assists, cards, minutes, tackles-won, interceptions, crosses; API-Football for passes, duels, and team-level xG. Serp API remains the runtime fallback for information not yet in the database.
+**Decision:** Merge two legitimate sources at the column level rather than relying on one: `soccerdata` (FBref) for goals, assists, cards, minutes, tackles-won, interceptions, and crosses (`crosses SMALLINT DEFAULT 0`, added to `player_match_stats` after this section was originally written); API-Football for passes, duels, and team-level xG. Serp API remains the runtime fallback for information not yet in the database.
 
 **Reasoning - the full investigation, since this scope took real work to arrive at:**
 
@@ -64,6 +64,18 @@ Some sub-fields (`shots.on`, `tackles.blocks`, `tackles.interceptions`, `key_pas
 **Data quality finding: API-Football's `passes.accuracy` field is mislabeled.** Despite the name, it is not a percentage - it's a raw count of completed passes. Confirmed across 19 players spanning 3 fixtures and 2 leagues: the value is always less than or equal to `passes.total`, and scales with pass volume rather than being an independent 0-100 value (e.g. a player with 9 total passes showed `accuracy: 4`, not a percentage like "44"). The schema column was originally named `pass_accuracy` (`NUMERIC(5,2)`, expecting a percentage); it's been renamed to `passes_completed` (`SMALLINT`) to reflect what the field actually contains, before any real data was ingested.
 
 **Trade-off accepted:** Player-level xG, xA, and progressive passing/carries are not available from any legitimate free source for live/current matches, and are dropped from V1 scope entirely (schema updated accordingly - see `db/schema.sql`). This means possession-control players whose value doesn't show up in goals/tackles/passes volume (e.g. a Pedri- or Rodri-type profile) will have a real, honest limitation in how deeply V1 can assess their game - the agent should be designed to acknowledge this rather than present false confidence. Team-level xG (not player-level) is available via API-Football and included in the `matches` table. Two data sources also means reconciling player/team identifiers across them during ingestion, rather than one unified source.
+
+---
+
+## Ingestion pipeline: built and verified end-to-end
+
+**Decision:** Built src/ingestion/ingest_match.py, which pulls FBref (via soccerdata) and API-Football data for a match, aligns players using src/scraping/name_matching.py, and upserts into player_match_stats. Verified against two real matches (Man City vs Arsenal, Liverpool vs Man Utd) with actual database rows checked back, not just "insert succeeded" logs.
+
+**Reasoning:** Name-matching required three layers, discovered by comparing full FBref vs API-Football player lists across real matches rather than assuming names would align: (1) filtering API-Football's full squad list down to players with minutes > 0, since API-Football returns the whole matchday squad while FBref only lists players who actually appeared; (2) Unicode normalization with an explicit override map for non-decomposing characters (O with stroke, sharp s, and similar) that standard NFKD normalization doesn't handle; (3) a manual alias table for genuine name differences that normalization can't fix (e.g. Savio vs Savinho, a full given name vs its short form). Verified to reach 100% match rate (30/30 and 32/32 players) across both test matches, with unmatched cases logged rather than silently dropped.
+
+**New finding: API-Football's sparse fields are non-deterministic, not just incomplete.** Rerunning ingestion for the same completed historical match returned a different value for the same player's tackles field across separate calls (a real 0, then null, on identical input) - confirmed via direct raw-response comparison, ruling out a bug in our own code. This is a stronger caveat than the earlier "some fields are sparsely populated" finding, since it shows the same field for the same player in the same finished match isn't even stable across calls, not just inconsistently present across different players.
+
+**Trade-off accepted / mitigation:** Since a rerun could silently regress a real, previously-ingested value back to null, the upsert logic was changed so incoming null values from API-Football never overwrite an existing non-null value in the database - only real values, or inserts into previously-empty rows, are written. Verified via a direct, deterministic test (set a real value, apply an incoming null, confirm the value is preserved) rather than relying on API-Football happening to demonstrate the flakiness itself.
 
 ---
 
