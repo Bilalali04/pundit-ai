@@ -5,6 +5,12 @@ from src.db.models import Player, PlayerMatchStats
 
 
 def get_player_match_stats(player_name: str, match_id: int) -> dict | None:
+    """Get a player's recorded stats for one specific match.
+
+    Args:
+        player_name: The player's full name, e.g. "Declan Rice".
+        match_id: The database match_id to look up stats for.
+    """
     session = SessionLocal()
     try:
         stats = session.scalar(
