@@ -79,6 +79,8 @@ def get_or_create_player_match_stats(session, match_id, player_id, **fields):
         session.add(stats)
     else:
         for key, value in fields.items():
+            if value is None and getattr(stats, key) is not None:
+                continue
             setattr(stats, key, value)
     session.flush()
     return stats
