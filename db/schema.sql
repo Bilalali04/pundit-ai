@@ -48,6 +48,8 @@ CREATE TABLE matches (
     away_team_id    INTEGER REFERENCES teams(team_id),
     home_score      SMALLINT,
     away_score      SMALLINT,
+    home_xg         NUMERIC(4,2),                -- team-level expected goals, from API-Football
+    away_xg         NUMERIC(4,2),
     season          VARCHAR(9),                  -- e.g. '2025-2026'
     source          VARCHAR(20),                  -- 'fbref', 'understat', 'api-football'
     scraped_at      TIMESTAMP DEFAULT NOW(),
@@ -62,16 +64,18 @@ CREATE TABLE player_match_stats (
     minutes_played  SMALLINT,
     goals           SMALLINT DEFAULT 0,
     assists         SMALLINT DEFAULT 0,
-    xg              NUMERIC(4,2) DEFAULT 0,
-    xa              NUMERIC(4,2) DEFAULT 0,
     tackles         SMALLINT DEFAULT 0,
     tackles_won     SMALLINT DEFAULT 0,
     interceptions   SMALLINT DEFAULT 0,
-    passes_completed SMALLINT DEFAULT 0,
-    passes_attempted SMALLINT DEFAULT 0,
-    progressive_passes SMALLINT DEFAULT 0,
+    passes_total    INTEGER,
+    pass_accuracy   NUMERIC(5,2),
+    duels_total     SMALLINT DEFAULT 0,
     duels_won       SMALLINT DEFAULT 0,
-    duels_lost      SMALLINT DEFAULT 0,
+    key_passes      SMALLINT,
+    shots_total     SMALLINT,
+    shots_on_target SMALLINT,
+    dribbles_attempted   SMALLINT,
+    dribbles_successful  SMALLINT,
     yellow_cards    SMALLINT DEFAULT 0,
     red_cards       SMALLINT DEFAULT 0,
     rating          NUMERIC(3,1),                 -- if source provides one
@@ -129,7 +133,7 @@ CREATE INDEX idx_availability_match ON player_availability(match_id);
 -- WHERE p.name = 'Marquinhos' AND m.match_date = '2026-07-20';
 
 -- Season baseline for context ("above/below his norm")
--- SELECT AVG(tackles), AVG(passes_completed), AVG(rating)
+-- SELECT AVG(tackles), AVG(passes_total), AVG(rating)
 -- FROM player_match_stats pms
 -- JOIN matches m ON pms.match_id = m.match_id
 -- WHERE pms.player_id = <id> AND m.season = '2025-2026';
