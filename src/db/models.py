@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     SmallInteger,
     String,
@@ -84,6 +85,8 @@ class Match(Base):
     away_team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.team_id"))
     home_score: Mapped[int | None] = mapped_column(SmallInteger)
     away_score: Mapped[int | None] = mapped_column(SmallInteger)
+    home_xg: Mapped[Decimal | None] = mapped_column(Numeric(4, 2))
+    away_xg: Mapped[Decimal | None] = mapped_column(Numeric(4, 2))
     season: Mapped[str | None] = mapped_column(String(9))
     source: Mapped[str | None] = mapped_column(String(20))
     scraped_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
@@ -115,16 +118,18 @@ class PlayerMatchStats(Base):
     minutes_played: Mapped[int | None] = mapped_column(SmallInteger)
     goals: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     assists: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
-    xg: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), server_default=text("0"))
-    xa: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), server_default=text("0"))
     tackles: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     tackles_won: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     interceptions: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
-    passes_completed: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
-    passes_attempted: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
-    progressive_passes: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
+    passes_total: Mapped[int | None] = mapped_column(Integer)
+    pass_accuracy: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    duels_total: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     duels_won: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
-    duels_lost: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
+    key_passes: Mapped[int | None] = mapped_column(SmallInteger)
+    shots_total: Mapped[int | None] = mapped_column(SmallInteger)
+    shots_on_target: Mapped[int | None] = mapped_column(SmallInteger)
+    dribbles_attempted: Mapped[int | None] = mapped_column(SmallInteger)
+    dribbles_successful: Mapped[int | None] = mapped_column(SmallInteger)
     yellow_cards: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     red_cards: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     rating: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
