@@ -121,6 +121,7 @@ class PlayerMatchStats(Base):
     tackles: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     tackles_won: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     interceptions: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
+    crosses: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))
     passes_total: Mapped[int | None] = mapped_column(Integer)
     passes_completed: Mapped[int | None] = mapped_column(SmallInteger)
     duels_total: Mapped[int | None] = mapped_column(SmallInteger, server_default=text("0"))

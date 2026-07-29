@@ -67,6 +67,7 @@ CREATE TABLE player_match_stats (
     tackles         SMALLINT DEFAULT 0,
     tackles_won     SMALLINT DEFAULT 0,
     interceptions   SMALLINT DEFAULT 0,
+    crosses         SMALLINT DEFAULT 0,
     passes_total    INTEGER,
     passes_completed SMALLINT,
     duels_total     SMALLINT DEFAULT 0,

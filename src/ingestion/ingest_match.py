@@ -157,10 +157,10 @@ def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id):
                 "assists": row[("Performance", "Ast")],
                 "tackles_won": row[("Performance", "TklW")],
                 "interceptions": row[("Performance", "Int")],
+                "crosses": row[("Performance", "Crs")],
                 "yellow_cards": row[("Performance", "CrdY")],
                 "red_cards": row[("Performance", "CrdR")],
             }
-            # crosses has no dedicated schema column; captured via FBref's Crs -> not in schema, skipped
 
             if api_stats is not None:
                 fields.update(
