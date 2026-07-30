@@ -70,3 +70,35 @@ def match_player_name(fbref_name: str, active_api_players: dict[str, dict], matc
 
     logger.warning("No name match found for player %r in match %s", fbref_name, match_id)
     return None
+
+
+# Same club, genuinely different display name across sources (short form,
+# historical suffix). Add new pairs here as they're discovered.
+TEAM_ALIASES = {
+    "Manchester Utd": "Manchester United",
+    "Nottingham": "Nottingham Forest",
+    "Leeds United": "Leeds",
+}
+
+
+def match_team_name(fbref_name: str, api_team_names, match_id: str | None = None) -> str | None:
+    """Match an FBref team name against a collection of API-Football team names.
+
+    Returns the matching API-Football name, or None if no match was found
+    (logged as a warning so it can be reviewed and added to TEAM_ALIASES).
+    """
+    if fbref_name in api_team_names:
+        return fbref_name
+
+    normalized_lookup = {normalize_name(name): name for name in api_team_names}
+    normalized_fbref = normalize_name(fbref_name)
+
+    if normalized_fbref in normalized_lookup:
+        return normalized_lookup[normalized_fbref]
+
+    aliased = TEAM_ALIASES.get(fbref_name)
+    if aliased and aliased in api_team_names:
+        return aliased
+
+    logger.warning("No name match found for team %r in match %s", fbref_name, match_id)
+    return None
