@@ -133,6 +133,7 @@ def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id):
         )
 
         team_by_name = {home_name: home_team, away_name: away_team}
+        player_counts_by_team = {home_name: 0, away_name: 0}
         inserted_players = []
 
         for idx, row in fbref_stats.iterrows():
@@ -184,6 +185,15 @@ def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id):
 
             get_or_create_player_match_stats(session, match.match_id, player.player_id, **fields)
             inserted_players.append(fbref_name)
+            player_counts_by_team[resolved_team_name] += 1
+
+        for team_name, count in player_counts_by_team.items():
+            if count == 0:
+                raise RuntimeError(
+                    f"Zero players ingested for team {team_name!r} in match {fbref_match_id} "
+                    f"(API-Football fixture {api_fixture_id}, {home_name} vs {away_name}). "
+                    f"Likely a team-name mismatch between FBref and API-Football - check TEAM_ALIASES."
+                )
 
         session.commit()
         return match.match_id, inserted_players
