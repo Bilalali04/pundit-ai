@@ -86,12 +86,23 @@ def get_or_create_player_match_stats(session, match_id, player_id, **fields):
     return stats
 
 
-def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id):
+def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id, fbref_reader=None):
     headers = {"x-apisports-key": os.getenv("API_FOOTBALL_KEY")}
 
     # --- pull FBref data: goals, assists, cards, minutes, tackles-won, interceptions, crosses ---
-    fbref = sd.FBref(leagues=fbref_league, seasons=fbref_season)
-    fbref_stats = fbref.read_player_match_stats(stat_type="summary", match_id=fbref_match_id)
+    # A caller processing many matches should create one FBref reader and pass it in via
+    # fbref_reader, reusing the same browser session instead of launching a new one per match.
+    # If none is passed, we create (and clean up) our own for this single call.
+    owns_reader = fbref_reader is None
+    fbref = fbref_reader or sd.FBref(leagues=fbref_league, seasons=fbref_season)
+    try:
+        fbref_stats = fbref.read_player_match_stats(stat_type="summary", match_id=fbref_match_id)
+    finally:
+        if owns_reader:
+            try:
+                fbref._driver.quit()
+            except Exception:
+                pass
 
     # --- pull API-Football data: fixture info, team-level xG, player passes/duels/shots/dribbles ---
     fixture_resp = requests.get(f"{API_BASE}/fixtures", headers=headers, params={"id": api_fixture_id}, timeout=20)
