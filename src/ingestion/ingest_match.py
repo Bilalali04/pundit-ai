@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from src.db.connection import SessionLocal
 from src.db.models import League, Match, Player, PlayerMatchStats, Team
-from src.scraping.name_matching import filter_active_players, match_player_name
+from src.scraping.name_matching import filter_active_players, match_player_name, match_team_name
 
 load_dotenv()
 
@@ -138,7 +138,8 @@ def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id):
         for idx, row in fbref_stats.iterrows():
             fbref_name = idx[-1]
             fbref_team_name = idx[-2]
-            team = team_by_name.get(fbref_team_name)
+            resolved_team_name = match_team_name(fbref_team_name, team_by_name.keys(), match_id=fbref_match_id)
+            team = team_by_name.get(resolved_team_name) if resolved_team_name else None
             if team is None:
                 continue
 

@@ -78,6 +78,10 @@ TEAM_ALIASES = {
     "Manchester Utd": "Manchester United",
     "Nottingham": "Nottingham Forest",
     "Leeds United": "Leeds",
+    "Brighton & Hove Albion": "Brighton",
+    "Newcastle United": "Newcastle",
+    "Tottenham Hotspur": "Tottenham",
+    "West Ham United": "West Ham",
 }
 
 
