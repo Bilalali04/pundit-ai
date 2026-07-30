@@ -94,7 +94,9 @@ def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id, fbr
     # fbref_reader, reusing the same browser session instead of launching a new one per match.
     # If none is passed, we create (and clean up) our own for this single call.
     owns_reader = fbref_reader is None
-    fbref = fbref_reader or sd.FBref(leagues=fbref_league, seasons=fbref_season)
+    # headless=True: no dedicated config exists to disable soccerdata's automatic
+    # CAPTCHA-solving; headless mode is the only lever that skips its real solve attempts.
+    fbref = fbref_reader or sd.FBref(leagues=fbref_league, seasons=fbref_season, headless=True)
     try:
         fbref_stats = fbref.read_player_match_stats(stat_type="summary", match_id=fbref_match_id)
     finally:

@@ -1,4 +1,6 @@
 import os
+import random
+import time
 
 import requests
 import soccerdata as sd
@@ -79,7 +81,10 @@ def run(limit: int | None = None):
     # One FBref reader (one browser session) for the whole run, reused across every match,
     # instead of launching a new browser per match. Always closed when the run ends, whether
     # it finishes normally, hits the zero-player RuntimeError, or fails some other way.
-    fbref = sd.FBref(leagues=FBREF_LEAGUE, seasons=FBREF_SEASON)
+    # headless=True: soccerdata's solve_captcha() skips its real GUI-automation solve
+    # attempts entirely in headless mode (just waits, doesn't try to bypass) - there is
+    # no dedicated config flag for this in soccerdata/seleniumbase, this is the only lever.
+    fbref = sd.FBref(leagues=FBREF_LEAGUE, seasons=FBREF_SEASON, headless=True)
     try:
         schedule = fbref.read_schedule().reset_index()
 
@@ -127,12 +132,21 @@ def run(limit: int | None = None):
                 )
                 print(f"{label} - success ({len(players)} players)")
                 counts["success"] += 1
+                time.sleep(random.uniform(5, 6))
             except RuntimeError as e:
                 print(f"{label} - STOPPED: {e}")
+                raise
+            except ConnectionError as e:
+                # soccerdata raises a plain ConnectionError when its internal 5-attempt
+                # retry loop is exhausted - this is what surfaces after a CAPTCHA it
+                # couldn't get past, but the message doesn't confirm CAPTCHA specifically,
+                # so treat any such total download failure as a stop condition.
+                print(f"{label} - STOPPED (possible CAPTCHA block): {e}")
                 raise
             except Exception as e:
                 print(f"{label} - failed: {type(e).__name__}: {e}")
                 counts["failed"] += 1
+                time.sleep(random.uniform(5, 6))
 
         print()
         print(
