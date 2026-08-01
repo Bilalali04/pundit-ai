@@ -132,7 +132,7 @@ def run(limit: int | None = None):
                 )
                 print(f"{label} - success ({len(players)} players)")
                 counts["success"] += 1
-                time.sleep(random.uniform(5, 6))
+                time.sleep(random.uniform(10, 12))
             except RuntimeError as e:
                 print(f"{label} - STOPPED: {e}")
                 raise
@@ -146,7 +146,7 @@ def run(limit: int | None = None):
             except Exception as e:
                 print(f"{label} - failed: {type(e).__name__}: {e}")
                 counts["failed"] += 1
-                time.sleep(random.uniform(5, 6))
+                time.sleep(random.uniform(10, 12))
 
         print()
         print(
