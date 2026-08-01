@@ -46,3 +46,64 @@ def get_player_match_stats(player_name: str, match_id: int) -> dict | None:
         }
     finally:
         session.close()
+
+
+def get_player_season_baseline(player_name: str) -> dict | None:
+    """Get a player's aggregate/average stats across all matches ingested so far this season.
+
+    Args:
+        player_name: The player's full name, e.g. "Erling Haaland".
+    """
+    session = SessionLocal()
+    try:
+        rows = session.scalars(
+            select(PlayerMatchStats)
+            .join(Player, PlayerMatchStats.player_id == Player.player_id)
+            .where(Player.name == player_name)
+        ).all()
+
+        if not rows:
+            return None
+
+        matches_played = len(rows)
+        total_minutes = sum(r.minutes_played or 0 for r in rows)
+        total_goals = sum(r.goals or 0 for r in rows)
+        total_assists = sum(r.assists or 0 for r in rows)
+        total_yellow_cards = sum(r.yellow_cards or 0 for r in rows)
+        total_red_cards = sum(r.red_cards or 0 for r in rows)
+
+        avg_tackles_won_per_match = sum(r.tackles_won or 0 for r in rows) / matches_played
+        avg_interceptions_per_match = sum(r.interceptions or 0 for r in rows) / matches_played
+
+        total_duels_won = sum(r.duels_won or 0 for r in rows)
+        total_duels_total = sum(r.duels_total or 0 for r in rows)
+        duels_won_rate = total_duels_won / total_duels_total if total_duels_total else None
+
+        total_passes_completed = sum(r.passes_completed or 0 for r in rows)
+        total_passes_total = sum(r.passes_total or 0 for r in rows)
+        pass_completion_rate = total_passes_completed / total_passes_total if total_passes_total else None
+
+        small_sample_size = matches_played < 5
+
+        return {
+            "player_name": player_name,
+            "matches_played": matches_played,
+            "total_minutes": total_minutes,
+            "total_goals": total_goals,
+            "total_assists": total_assists,
+            "avg_tackles_won_per_match": round(avg_tackles_won_per_match, 2),
+            "avg_interceptions_per_match": round(avg_interceptions_per_match, 2),
+            "duels_won_rate": round(duels_won_rate, 3) if duels_won_rate is not None else None,
+            "pass_completion_rate": round(pass_completion_rate, 3) if pass_completion_rate is not None else None,
+            "total_yellow_cards": total_yellow_cards,
+            "total_red_cards": total_red_cards,
+            "small_sample_size": small_sample_size,
+            "note": (
+                f"Only {matches_played} match(es) played this season - averages may not be "
+                "a reliable baseline."
+                if small_sample_size
+                else None
+            ),
+        }
+    finally:
+        session.close()
