@@ -10,6 +10,7 @@ from src.db.models import League, Match, MatchEvent, Player, PlayerMatchStats, T
 from src.scraping.name_matching import (
     filter_active_players,
     match_abbreviated_name,
+    match_bare_first_name,
     match_player_name,
     match_team_name,
 )
@@ -139,6 +140,16 @@ def ingest_match_events(db_match_id: int, api_fixture_id: int) -> list[dict]:
             )
         }
 
+        # Team-scoped pools, keyed by API-Football's own team name (Team.name was created
+        # from that same name during ingest_match(), so it matches ev["team"]["name"] as-is
+        # with no further alias resolution needed here).
+        home_team = session.get(Team, match.home_team_id)
+        away_team = session.get(Team, match.away_team_id)
+        candidates_by_team_name = {
+            home_team.name: {p.name: p for p in candidates.values() if p.team_id == match.home_team_id},
+            away_team.name: {p.name: p for p in candidates.values() if p.team_id == match.away_team_id},
+        }
+
         inserted = []
         for ev in api_events:
             minute = ev["time"]["elapsed"]
@@ -175,6 +186,13 @@ def ingest_match_events(db_match_id: int, api_fixture_id: int) -> list[dict]:
                 # /fixtures/events frequently gives abbreviated names ("E. Haaland") rather
                 # than the full names /fixtures/players uses, so fall back to initial+lastname.
                 resolved_name = match_abbreviated_name(api_name, candidates.keys(), match_id=str(db_match_id))
+            if resolved_name is None:
+                # Bare first name with no initial/period at all (e.g. "Nico") - scope to
+                # just this event's team first, since pooling both rosters risks matching
+                # the wrong club's player entirely (e.g. Man City's Nico O'Reilly vs
+                # Arsenal's Nico Gonzalez).
+                team_candidates = candidates_by_team_name.get(ev["team"]["name"], {})
+                resolved_name = match_bare_first_name(api_name, team_candidates.keys(), match_id=str(db_match_id))
             player = candidates.get(resolved_name) if resolved_name else None
             player_id = player.player_id if player else None
 
@@ -183,6 +201,7 @@ def ingest_match_events(db_match_id: int, api_fixture_id: int) -> list[dict]:
                 {
                     "event_id": event.event_id,
                     "api_name": api_name,
+                    "team": ev["team"]["name"],
                     "resolved_player": player.name if player else None,
                     "minute": minute,
                     "event_type": event_type,

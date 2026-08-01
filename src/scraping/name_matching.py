@@ -124,6 +124,43 @@ def match_abbreviated_name(abbreviated_name: str, full_names, match_id: str | No
     return None
 
 
+def match_bare_first_name(name: str, full_names, match_id: str | None = None) -> str | None:
+    """Match a bare single-token name (e.g. "Nico") against known full names by first name.
+
+    full_names should be scoped to ONE team's roster, not both teams pooled - a bare
+    first name is likely to collide across two 25+ player squads (e.g. "Nico" matches
+    both "Nico O'Reilly" and "Nico Gonzalez" if both rosters are checked at once), so
+    the caller is expected to resolve the event's team first and pass only that team's
+    players here.
+
+    Returns the matching full name, or None if no candidate matches or more than one
+    does (logged as a warning in the ambiguous case, so it can be reviewed rather than
+    guessed).
+    """
+    normalized_name = normalize_name(name.strip())
+
+    candidates = []
+    for full_name in full_names:
+        first_token = full_name.split()[0]
+        if normalize_name(first_token) == normalized_name:
+            candidates.append(full_name)
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    if len(candidates) > 1:
+        logger.warning(
+            "Ambiguous bare first name %r in match %s - matches multiple players: %s",
+            name,
+            match_id,
+            candidates,
+        )
+        return None
+
+    logger.warning("No name match found for bare first name %r in match %s", name, match_id)
+    return None
+
+
 # Same club, genuinely different display name across sources (short form,
 # historical suffix). Add new pairs here as they're discovered.
 TEAM_ALIASES = {
