@@ -5,7 +5,7 @@ from google import genai
 from google.genai import types
 
 from src.agent.agent import SYSTEM_PROMPT
-from src.agent.tools import get_player_match_stats
+from src.agent.tools import get_player_match_stats, get_player_season_baseline
 
 load_dotenv()
 
@@ -16,7 +16,7 @@ def main():
         model="gemini-3.1-flash-lite",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[get_player_match_stats],
+            tools=[get_player_match_stats, get_player_season_baseline],
         ),
     )
 

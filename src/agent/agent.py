@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from src.agent.tools import get_player_match_stats
+from src.agent.tools import get_player_match_stats, get_player_season_baseline
 
 load_dotenv()
 
@@ -31,7 +31,7 @@ def ask(question: str) -> str:
         contents=question,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[get_player_match_stats],
+            tools=[get_player_match_stats, get_player_season_baseline],
         ),
     )
 
