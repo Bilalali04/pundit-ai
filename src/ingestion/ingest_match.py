@@ -6,8 +6,13 @@ from dotenv import load_dotenv
 from sqlalchemy import select
 
 from src.db.connection import SessionLocal
-from src.db.models import League, Match, Player, PlayerMatchStats, Team
-from src.scraping.name_matching import filter_active_players, match_player_name, match_team_name
+from src.db.models import League, Match, MatchEvent, Player, PlayerMatchStats, Team
+from src.scraping.name_matching import (
+    filter_active_players,
+    match_abbreviated_name,
+    match_player_name,
+    match_team_name,
+)
 
 load_dotenv()
 
@@ -84,6 +89,111 @@ def get_or_create_player_match_stats(session, match_id, player_id, **fields):
             setattr(stats, key, value)
     session.flush()
     return stats
+
+
+def get_or_create_match_event(session, match_id, player_id, minute, event_type, detail):
+    # detail is included in the lookup because player_id is frequently None (unresolved
+    # player name) - two distinct events at the same minute/type would otherwise collide
+    # on (match_id, NULL, minute, event_type) and the second would be silently dropped.
+    event = session.scalar(
+        select(MatchEvent).where(
+            MatchEvent.match_id == match_id,
+            MatchEvent.player_id == player_id,
+            MatchEvent.minute == minute,
+            MatchEvent.event_type == event_type,
+            MatchEvent.detail == detail,
+        )
+    )
+    if event is None:
+        event = MatchEvent(match_id=match_id, player_id=player_id, minute=minute, event_type=event_type, detail=detail)
+        session.add(event)
+        session.flush()
+    return event
+
+
+def ingest_match_events(db_match_id: int, api_fixture_id: int) -> list[dict]:
+    """Ingest goal/card/substitution events for a match from API-Football's /fixtures/events.
+
+    Player names in this endpoint are abbreviated (e.g. "R. Cherki") compared to the
+    full names already stored from FBref ingestion (e.g. "Rayan Cherki"), so each name
+    is resolved against the match's two team rosters via match_player_name() - which may
+    or may not succeed given that mismatch, since it wasn't built for abbreviation expansion.
+    """
+    headers = {"x-apisports-key": os.getenv("API_FOOTBALL_KEY")}
+
+    events_resp = requests.get(
+        f"{API_BASE}/fixtures/events", headers=headers, params={"fixture": api_fixture_id}, timeout=20
+    )
+    api_events = events_resp.json()["response"]
+
+    session = SessionLocal()
+    try:
+        match = session.get(Match, db_match_id)
+        if match is None:
+            raise ValueError(f"No match found with match_id={db_match_id}")
+
+        candidates = {
+            p.name: p
+            for p in session.scalars(
+                select(Player).where(Player.team_id.in_([match.home_team_id, match.away_team_id]))
+            )
+        }
+
+        inserted = []
+        for ev in api_events:
+            minute = ev["time"]["elapsed"]
+            if ev["time"].get("extra"):
+                minute += ev["time"]["extra"]
+
+            api_type = ev["type"]
+            api_detail = ev.get("detail") or ""
+
+            if api_type == "Goal":
+                event_type = "own_goal" if "Own Goal" in api_detail else "goal"
+                api_name = ev["player"]["name"]
+                assist_name = (ev.get("assist") or {}).get("name")
+                detail = api_detail if not assist_name else f"{api_detail} (assist: {assist_name})"
+            elif api_type == "Card":
+                event_type = "card"
+                api_name = ev["player"]["name"]
+                comments = ev.get("comments")
+                detail = api_detail if not comments else f"{api_detail} - {comments}"
+            elif api_type == "subst":
+                # API-Football's "player" is who came off, "assist" is who came on.
+                event_type = "substitution"
+                api_name = (ev.get("assist") or {}).get("name")
+                outgoing_name = ev["player"]["name"]
+                detail = f"{api_detail}: on for {outgoing_name}"
+            else:
+                continue
+
+            if not api_name:
+                continue
+
+            resolved_name = match_player_name(api_name, candidates, match_id=str(db_match_id))
+            if resolved_name is None:
+                # /fixtures/events frequently gives abbreviated names ("E. Haaland") rather
+                # than the full names /fixtures/players uses, so fall back to initial+lastname.
+                resolved_name = match_abbreviated_name(api_name, candidates.keys(), match_id=str(db_match_id))
+            player = candidates.get(resolved_name) if resolved_name else None
+            player_id = player.player_id if player else None
+
+            event = get_or_create_match_event(session, db_match_id, player_id, minute, event_type, detail)
+            inserted.append(
+                {
+                    "event_id": event.event_id,
+                    "api_name": api_name,
+                    "resolved_player": player.name if player else None,
+                    "minute": minute,
+                    "event_type": event_type,
+                    "detail": detail,
+                }
+            )
+
+        session.commit()
+        return inserted
+    finally:
+        session.close()
 
 
 def ingest_match(fbref_league, fbref_season, fbref_match_id, api_fixture_id, fbref_reader=None):

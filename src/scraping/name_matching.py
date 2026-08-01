@@ -1,4 +1,5 @@
 import logging
+import re
 import unicodedata
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ def normalize_name(name: str) -> str:
 
 
 _ALIASES = {normalize_name(fbref_name): normalize_name(api_name) for fbref_name, api_name in _ALIAS_PAIRS}
+_ALIASES_REVERSE = {api_name: fbref_name for fbref_name, api_name in _ALIASES.items()}
 
 
 def filter_active_players(api_players: list[dict]) -> dict[str, dict]:
@@ -64,11 +66,61 @@ def match_player_name(fbref_name: str, active_api_players: dict[str, dict], matc
     if normalized_fbref in normalized_lookup:
         return normalized_lookup[normalized_fbref]
 
-    aliased = _ALIASES.get(normalized_fbref)
+    # Checked in both directions since callers don't always pass an FBref-style name
+    # first - ingest_match_events() passes an API-Football name first, for example.
+    aliased = _ALIASES.get(normalized_fbref) or _ALIASES_REVERSE.get(normalized_fbref)
     if aliased and aliased in normalized_lookup:
         return normalized_lookup[aliased]
 
     logger.warning("No name match found for player %r in match %s", fbref_name, match_id)
+    return None
+
+
+_ABBREVIATED_NAME_RE = re.compile(r"^([A-Za-zÀ-ÿ])\.\s+(.+)$")
+
+
+def match_abbreviated_name(abbreviated_name: str, full_names, match_id: str | None = None) -> str | None:
+    """Match an API-Football abbreviated name like "E. Haaland" against known full names.
+
+    full_names is an iterable of full names for the two rosters involved in the match
+    (both teams combined, so ambiguity - two players sharing an initial + last name -
+    can actually be detected rather than silently matching the wrong side).
+
+    Returns the matching full name, or None if the input isn't in "F. Lastname" form,
+    no candidate matches, or more than one candidate matches (logged as a warning in
+    the ambiguous case, so it can be reviewed rather than guessed).
+    """
+    match = _ABBREVIATED_NAME_RE.match(abbreviated_name.strip())
+    if not match:
+        return None
+
+    initial, last_name_part = match.groups()
+    normalized_initial = normalize_name(initial)
+    normalized_last_name = normalize_name(last_name_part)
+
+    candidates = []
+    for full_name in full_names:
+        tokens = full_name.split()
+        if len(tokens) < 2:
+            continue  # mononym - no last name to compare against
+        candidate_initial = normalize_name(tokens[0])[:1]
+        candidate_last_name = normalize_name(" ".join(tokens[1:]))
+        if candidate_initial == normalized_initial and candidate_last_name == normalized_last_name:
+            candidates.append(full_name)
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    if len(candidates) > 1:
+        logger.warning(
+            "Ambiguous abbreviated name %r in match %s - matches multiple players: %s",
+            abbreviated_name,
+            match_id,
+            candidates,
+        )
+        return None
+
+    logger.warning("No name match found for abbreviated name %r in match %s", abbreviated_name, match_id)
     return None
 
 
