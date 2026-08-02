@@ -11,6 +11,7 @@ from src.agent.tools import (
     get_player_season_baseline,
     get_position_expectations,
     get_team_matches,
+    search_web,
 )
 
 load_dotenv()
@@ -37,7 +38,19 @@ SYSTEM_PROMPT = (
     "with a reasonable limit (10-15 recent matches) rather than pulling the full season - a "
     "recent sample is enough to characterize a trend and is far cheaper than checking every "
     "match. Only omit the limit (full season) if the user specifically asks for full-season or "
-    "historical analysis."
+    "historical analysis.\n\n"
+    "search_web is strictly for information that is genuinely outside the database's scope by "
+    "nature - injury news, transfer rumors/news, contract situations, manager/club news, or "
+    "other current-events football news that isn't a match performance stat. It is NOT a "
+    "fallback for match/player questions the database tools simply failed to find (e.g. a "
+    "typo'd player name, an unresolved match) - if a database tool returns no result, ask the "
+    "user to clarify or correct the name/details rather than falling back to search_web. Never "
+    "use search_web for anything the database tools are designed to answer (match stats, "
+    "season stats, match events, team patterns), even if a specific query happens to fail. In "
+    "your final answer, always clearly distinguish web-search-derived information from "
+    "verified database stats (e.g. 'per a recent news report...' rather than stating it as "
+    "fact), and summarize/paraphrase search findings in your own words rather than quoting "
+    "them directly."
 )
 
 
@@ -56,6 +69,7 @@ def ask(question: str) -> str:
                 get_position_expectations,
                 find_match,
                 get_team_matches,
+                search_web,
             ],
         ),
     )

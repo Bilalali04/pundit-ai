@@ -1,8 +1,13 @@
+import os
+
+import requests
 from sqlalchemy import or_, select
 
 from src.db.connection import SessionLocal
 from src.db.models import Match, MatchEvent, Player, PlayerMatchStats, Team
 from src.scraping.name_matching import TEAM_ALIASES, normalize_name
+
+SERP_API_URL = "https://serpapi.com/search"
 
 
 def get_player_match_stats(player_name: str, match_id: int) -> dict | None:
@@ -340,3 +345,40 @@ def get_match_events(match_id: int) -> list[dict]:
         ]
     finally:
         session.close()
+
+
+def search_web(query: str) -> dict:
+    """Search the web for current, real-world football information not covered by the
+    database - injury news, transfer rumors, contract situations, manager/club news, or other
+    current events. Not for match/player stats, which come from the database tools instead.
+
+    Args:
+        query: The search query, e.g. "Declan Rice injury news".
+    """
+    resp = requests.get(
+        SERP_API_URL,
+        params={"q": query, "api_key": os.getenv("SERP_API_KEY")},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    ai_overview = data.get("ai_overview")
+    ai_overview_text = None
+    if ai_overview:
+        ai_overview_text = "\n".join(
+            block["snippet"] for block in ai_overview.get("text_blocks", []) if block.get("snippet")
+        )
+
+    results = [
+        {
+            "title": r.get("title"),
+            "link": r.get("link"),
+            "snippet": r.get("snippet"),
+            "date": r.get("date"),
+            "source": r.get("source"),
+        }
+        for r in data.get("organic_results", [])[:5]
+    ]
+
+    return {"query": query, "ai_overview": ai_overview_text, "results": results}

@@ -12,6 +12,7 @@ from src.agent.tools import (
     get_player_season_baseline,
     get_position_expectations,
     get_team_matches,
+    search_web,
 )
 
 load_dotenv()
@@ -30,6 +31,7 @@ def main():
                 get_position_expectations,
                 find_match,
                 get_team_matches,
+                search_web,
             ],
         ),
     )
