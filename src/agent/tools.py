@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from src.db.connection import SessionLocal
-from src.db.models import Player, PlayerMatchStats
+from src.db.models import MatchEvent, Player, PlayerMatchStats, Team
 
 
 def get_player_match_stats(player_name: str, match_id: int) -> dict | None:
@@ -105,5 +105,35 @@ def get_player_season_baseline(player_name: str) -> dict | None:
                 else None
             ),
         }
+    finally:
+        session.close()
+
+
+def get_match_events(match_id: int) -> list[dict]:
+    """Get all recorded events (goals, cards, substitutions) for one match, ordered by minute.
+
+    Args:
+        match_id: The database match_id to look up events for.
+    """
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            select(MatchEvent, Player, Team)
+            .outerjoin(Player, MatchEvent.player_id == Player.player_id)
+            .outerjoin(Team, Player.team_id == Team.team_id)
+            .where(MatchEvent.match_id == match_id)
+            .order_by(MatchEvent.minute)
+        ).all()
+
+        return [
+            {
+                "event_type": event.event_type,
+                "minute": event.minute,
+                "player_name": player.name if player else None,
+                "team": team.name if team else None,
+                "detail": event.detail,
+            }
+            for event, player, team in rows
+        ]
     finally:
         session.close()
