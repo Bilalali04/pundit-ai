@@ -13,16 +13,18 @@ def get_player_match_stats(player_name: str, match_id: int) -> dict | None:
     """
     session = SessionLocal()
     try:
-        stats = session.scalar(
-            select(PlayerMatchStats)
+        result = session.execute(
+            select(PlayerMatchStats, Player)
             .join(Player, PlayerMatchStats.player_id == Player.player_id)
             .where(Player.name == player_name, PlayerMatchStats.match_id == match_id)
-        )
-        if stats is None:
+        ).first()
+        if result is None:
             return None
+        stats, player = result
 
         return {
             "player_name": player_name,
+            "position": player.position,
             "match_id": stats.match_id,
             "minutes_played": stats.minutes_played,
             "goals": stats.goals,
@@ -56,14 +58,17 @@ def get_player_season_baseline(player_name: str) -> dict | None:
     """
     session = SessionLocal()
     try:
-        rows = session.scalars(
-            select(PlayerMatchStats)
+        results = session.execute(
+            select(PlayerMatchStats, Player)
             .join(Player, PlayerMatchStats.player_id == Player.player_id)
             .where(Player.name == player_name)
         ).all()
 
-        if not rows:
+        if not results:
             return None
+
+        rows = [r[0] for r in results]
+        position = results[0][1].position
 
         matches_played = len(rows)
         total_minutes = sum(r.minutes_played or 0 for r in rows)
@@ -87,6 +92,7 @@ def get_player_season_baseline(player_name: str) -> dict | None:
 
         return {
             "player_name": player_name,
+            "position": position,
             "matches_played": matches_played,
             "total_minutes": total_minutes,
             "total_goals": total_goals,
