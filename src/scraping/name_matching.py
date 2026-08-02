@@ -21,6 +21,11 @@ _CHAR_OVERRIDES = {
 _ALIAS_PAIRS = [
     ("Sávio", "Savinho"),
     ("Nicolás González", "Nico González"),
+    ("Valentín Castellanos", "Taty Castellanos"),
+    ("Tino Livramento", "Valentino Livramento"),
+    ("Joshua Acheampong", "Josh Acheampong"),
+    ("Emi Buendía", "Emiliano Buendía"),
+    ("Eddie Nketiah", "Edward Nketiah"),
 ]
 
 
@@ -76,36 +81,56 @@ def match_player_name(fbref_name: str, active_api_players: dict[str, dict], matc
     return None
 
 
-_ABBREVIATED_NAME_RE = re.compile(r"^([A-Za-zÀ-ÿ])\.\s+(.+)$")
+_ABBREVIATED_NAME_RE = re.compile(r"^((?:[A-Za-zÀ-ÿ]\.\s*)+)(.+)$")
 
 
 def match_abbreviated_name(abbreviated_name: str, full_names, match_id: str | None = None) -> str | None:
-    """Match an API-Football abbreviated name like "E. Haaland" against known full names.
+    """Match an API-Football abbreviated name like "E. Haaland" or "D. M. Wolfe" against
+    known full names.
+
+    Handles any number of leading initials (API-Football sometimes gives two, e.g. for a
+    player with a two-part given name), matching on the FIRST initial only and comparing
+    the surname portion against each candidate's trailing N tokens, where N is however
+    many words the abbreviated form's own surname portion has. This correctly handles
+    both compound surnames ("van Hecke") and candidates whose full name has extra given
+    names before the real surname ("Jaydon Amauri Banel" matches "J. Banel" via just its
+    last token, not "Amauri Banel").
+
+    Each candidate is also checked against its alias (if any in _ALIAS_PAIRS), since a
+    nickname's initial can differ from the formal name's initial (e.g. "T. Castellanos"
+    for the nickname Taty, formal name Valentín) - matching only the candidate's own name
+    would never catch that.
 
     full_names is an iterable of full names for the two rosters involved in the match
-    (both teams combined, so ambiguity - two players sharing an initial + last name -
-    can actually be detected rather than silently matching the wrong side).
+    (both teams combined, so ambiguity - two players sharing an initial + surname - can
+    actually be detected rather than silently matching the wrong side).
 
-    Returns the matching full name, or None if the input isn't in "F. Lastname" form,
-    no candidate matches, or more than one candidate matches (logged as a warning in
-    the ambiguous case, so it can be reviewed rather than guessed).
+    Returns the matching full name, or None if the input isn't in abbreviated form, no
+    candidate matches, or more than one candidate matches (logged as a warning in the
+    ambiguous case, so it can be reviewed rather than guessed).
     """
     match = _ABBREVIATED_NAME_RE.match(abbreviated_name.strip())
     if not match:
         return None
 
-    initial, last_name_part = match.groups()
-    normalized_initial = normalize_name(initial)
-    normalized_last_name = normalize_name(last_name_part)
+    initials_part, surname_part = match.groups()
+    first_initial = normalize_name(initials_part.strip()[0])
+    normalized_surname = normalize_name(surname_part.strip())
+    surname_word_count = len(surname_part.strip().split())
+
+    def variant_matches(name_variant: str) -> bool:
+        tokens = name_variant.split()
+        if len(tokens) <= surname_word_count:
+            return False
+        variant_initial = normalize_name(tokens[0])[:1]
+        variant_surname = normalize_name(" ".join(tokens[-surname_word_count:]))
+        return variant_initial == first_initial and variant_surname == normalized_surname
 
     candidates = []
     for full_name in full_names:
-        tokens = full_name.split()
-        if len(tokens) < 2:
-            continue  # mononym - no last name to compare against
-        candidate_initial = normalize_name(tokens[0])[:1]
-        candidate_last_name = normalize_name(" ".join(tokens[1:]))
-        if candidate_initial == normalized_initial and candidate_last_name == normalized_last_name:
+        normalized_full = normalize_name(full_name)
+        aliased = _ALIASES.get(normalized_full) or _ALIASES_REVERSE.get(normalized_full)
+        if variant_matches(full_name) or (aliased and variant_matches(aliased)):
             candidates.append(full_name)
 
     if len(candidates) == 1:
