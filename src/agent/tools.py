@@ -115,6 +115,61 @@ def get_player_season_baseline(player_name: str) -> dict | None:
         session.close()
 
 
+def get_position_expectations(position: str) -> dict | None:
+    """Get average per-match stats across all players listed at a given position this season,
+    to use as a baseline for what's normal for that position (e.g. a CB's tackles/interceptions
+    vs a FW's goals/assists).
+
+    Positions with multiple listed roles (e.g. "FW,MF") are treated as their own distinct group,
+    not split across "FW" and "MF" - an exact match on the position string as stored.
+
+    Args:
+        position: The position code to look up, e.g. "CB", "FW", "CM", or a compound value like
+            "FW,MF" exactly as stored on the player.
+    """
+    session = SessionLocal()
+    try:
+        results = session.execute(
+            select(PlayerMatchStats, Player)
+            .join(Player, PlayerMatchStats.player_id == Player.player_id)
+            .where(Player.position == position)
+        ).all()
+
+        if not results:
+            return None
+
+        rows = [r[0] for r in results]
+        player_count = len({r[1].player_id for r in results})
+        matches_played = len(rows)
+
+        avg_goals_per_match = sum(r.goals or 0 for r in rows) / matches_played
+        avg_assists_per_match = sum(r.assists or 0 for r in rows) / matches_played
+        avg_tackles_won_per_match = sum(r.tackles_won or 0 for r in rows) / matches_played
+        avg_interceptions_per_match = sum(r.interceptions or 0 for r in rows) / matches_played
+
+        total_duels_won = sum(r.duels_won or 0 for r in rows)
+        total_duels_total = sum(r.duels_total or 0 for r in rows)
+        duels_won_rate = total_duels_won / total_duels_total if total_duels_total else None
+
+        total_passes_completed = sum(r.passes_completed or 0 for r in rows)
+        total_passes_total = sum(r.passes_total or 0 for r in rows)
+        pass_completion_rate = total_passes_completed / total_passes_total if total_passes_total else None
+
+        return {
+            "position": position,
+            "player_count": player_count,
+            "matches_sampled": matches_played,
+            "avg_goals_per_match": round(avg_goals_per_match, 3),
+            "avg_assists_per_match": round(avg_assists_per_match, 3),
+            "avg_tackles_won_per_match": round(avg_tackles_won_per_match, 2),
+            "avg_interceptions_per_match": round(avg_interceptions_per_match, 2),
+            "duels_won_rate": round(duels_won_rate, 3) if duels_won_rate is not None else None,
+            "pass_completion_rate": round(pass_completion_rate, 3) if pass_completion_rate is not None else None,
+        }
+    finally:
+        session.close()
+
+
 def get_match_events(match_id: int) -> list[dict]:
     """Get all recorded events (goals, cards, substitutions) for one match, ordered by minute.
 
