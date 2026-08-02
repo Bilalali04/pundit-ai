@@ -197,6 +197,9 @@ TEAM_ALIASES = {
     "Tottenham Hotspur": "Tottenham",
     "West Ham United": "West Ham",
     "Wolverhampton Wanderers": "Wolves",
+    "Man City": "Manchester City",
+    "Man Utd": "Manchester United",
+    "Spurs": "Tottenham",
 }
 
 
