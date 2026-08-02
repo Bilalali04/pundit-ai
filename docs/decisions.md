@@ -79,6 +79,20 @@ Some sub-fields (`shots.on`, `tackles.blocks`, `tackles.interceptions`, `key_pas
 
 ---
 
+## Match events: built on API-Football only, 98.84% player-resolution rate
+
+**Decision:** match_events ingestion uses API-Football's /fixtures/events endpoint exclusively - no FBref involved, despite FBref also having a real events timeline (confirmed via its events_wrap div, cross-validated against API-Football's data with 100% agreement on a test match). API-Football was chosen since it's structured JSON with no scraping/CAPTCHA risk, and since both sources agreed exactly, there was no benefit to using both.
+
+**Reasoning - player-name resolution required extending the matching approach:** API-Football's events feed uses abbreviated and inconsistent name formats (e.g. "E. Haaland" for a goal but "Erling Haaland" for a card, in the same response). Built a three-tier fallback: exact/alias match, then abbreviated "F. Lastname" matching, then team-scoped bare-first-name matching (scoped to the specific team an event belongs to, to avoid misattributing an event to a same-named player on the opposing team - verified against a real case with two different "Nico"s in the database).
+
+A first pass reached 97.3% resolution (5,519/5,673 events). Spot-checking the unresolved 154 (rather than accepting the aggregate number) found 72% of failures traced to one structural gap: the abbreviated-name matcher only handled a single initial and assumed a single-token surname, which broke on multi-initial names (e.g. "D. M. Wolfe" vs DB's "David Møller Wolfe") and multi-given-name players (e.g. "M. Diouf" vs DB's "El Hadji Malick Diouf"). Fixing this plus adding several nickname aliases raised resolution to 98.84% (5,607/5,673).
+
+**Trade-off accepted - remaining 66 unresolved events (1.16%), left as-is:** every remaining case was individually traced, not left as unexplained noise. Roughly a third are correctly, permanently unresolvable by design (players with zero rows in the database at all, or genuine ambiguity like Arsenal fielding three players named Gabriel - the system correctly declines to guess rather than misattribute). The rest are narrow, low-value edge cases (transliteration spelling differences, hyphen-vs-space compound surnames, Turkish diacritics, Korean name-order, and 3 bare-surname collisions like two different players named Cunha on different teams). Fixing these fully would require increasingly specific logic for a shrinking number of events - judged not worth the effort given the core stat-based analysis (player_match_stats) is entirely unaffected by any of this, and the failure mode throughout is "event stays unresolved/incomplete," never "event attributed to the wrong player."
+
+**Known data-modeling gap, noted for later:** Jørgen Strand Larsen has two separate Player rows (Wolves and Crystal Palace) from a mid-season transfer, since players are currently keyed by (name, team_id) rather than a stable player identity independent of team. Not fixed now - would require a real schema change - but worth knowing about if transfers become relevant elsewhere.
+
+---
+
 ## Machine learning approach: no ML in V1, XGBoost in V2
 
 **Decision:** V1 (player/match performance analyst) uses no trained model - the LLM reasons directly over retrieved stats. V2 (match outcome prediction) uses an XGBoost 3-class classifier (home win / draw / away win).
