@@ -202,6 +202,18 @@ def _resolve_team(session, name: str) -> Team | None:
     return None
 
 
+def _summarize_match(session, m: Match) -> dict:
+    home = session.get(Team, m.home_team_id)
+    away = session.get(Team, m.away_team_id)
+    return {
+        "match_id": m.match_id,
+        "date": m.match_date.isoformat(),
+        "home_team": home.name,
+        "away_team": away.name,
+        "score": f"{m.home_score}-{m.away_score}" if m.home_score is not None else None,
+    }
+
+
 def find_match(home_team: str, away_team: str) -> dict:
     """Find the match_id(s) for a fixture between two named teams this season, regardless of
     which one actually played at home - use this when the user names two teams but not a
@@ -245,19 +257,8 @@ def find_match(home_team: str, away_team: str) -> dict:
                 "message": f"No match found between {team_a.name} and {team_b.name} this season.",
             }
 
-        def _summarize(m: Match) -> dict:
-            home = session.get(Team, m.home_team_id)
-            away = session.get(Team, m.away_team_id)
-            return {
-                "match_id": m.match_id,
-                "date": m.match_date.isoformat(),
-                "home_team": home.name,
-                "away_team": away.name,
-                "score": f"{m.home_score}-{m.away_score}" if m.home_score is not None else None,
-            }
-
         if len(matches) == 1:
-            return {"status": "found", **_summarize(matches[0])}
+            return {"status": "found", **_summarize_match(session, matches[0])}
 
         return {
             "status": "multiple_matches",
@@ -265,7 +266,47 @@ def find_match(home_team: str, away_team: str) -> dict:
                 f"{team_a.name} and {team_b.name} played each other {len(matches)} times this "
                 "season - specify which match_id to use."
             ),
-            "candidates": [_summarize(m) for m in matches],
+            "candidates": [_summarize_match(session, m) for m in matches],
+        }
+    finally:
+        session.close()
+
+
+def get_team_matches(team_name: str, limit: int | None = None) -> dict:
+    """Get a team's match_ids for the season, ordered by date - use this when a question is
+    about a team as a whole (e.g. their disciplinary record, form, or results) rather than a
+    specific opponent, so you have real match_ids to check events/stats across instead of
+    guessing one.
+
+    Args:
+        team_name: The team name, possibly shorthand (e.g. "City", "Spurs") - fuzzy matching
+            is applied, same as find_match.
+        limit: Optional cap on how many matches to return (earliest first). Omit for all
+            matches this season.
+    """
+    session = SessionLocal()
+    try:
+        team = _resolve_team(session, team_name)
+        if team is None:
+            return {"status": "team_not_found", "message": f"Could not resolve team name: {team_name}."}
+
+        query = (
+            select(Match)
+            .where(or_(Match.home_team_id == team.team_id, Match.away_team_id == team.team_id))
+            .order_by(Match.match_date)
+        )
+        if limit:
+            query = query.limit(limit)
+        matches = session.scalars(query).all()
+
+        if not matches:
+            return {"status": "no_matches_found", "message": f"No matches found for {team.name} this season."}
+
+        return {
+            "status": "found",
+            "team": team.name,
+            "match_count": len(matches),
+            "matches": [_summarize_match(session, m) for m in matches],
         }
     finally:
         session.close()

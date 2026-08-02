@@ -10,6 +10,7 @@ from src.agent.tools import (
     get_player_match_stats,
     get_player_season_baseline,
     get_position_expectations,
+    get_team_matches,
 )
 
 load_dotenv()
@@ -30,7 +31,13 @@ SYSTEM_PROMPT = (
     "'multiple_matches', do NOT pick one automatically. Stop and ask the user which specific "
     "match they meant, listing each candidate's date and score so they can choose - only call "
     "get_player_match_stats, get_match_events, or any other match-specific tool once you know "
-    "the exact match_id."
+    "the exact match_id.\n\n"
+    "When a question is about a team's pattern, tendency, or record over the season (e.g. "
+    "disciplinary record, recent form) rather than one specific match, call get_team_matches "
+    "with a reasonable limit (10-15 recent matches) rather than pulling the full season - a "
+    "recent sample is enough to characterize a trend and is far cheaper than checking every "
+    "match. Only omit the limit (full season) if the user specifically asks for full-season or "
+    "historical analysis."
 )
 
 
@@ -48,6 +55,7 @@ def ask(question: str) -> str:
                 get_match_events,
                 get_position_expectations,
                 find_match,
+                get_team_matches,
             ],
         ),
     )
