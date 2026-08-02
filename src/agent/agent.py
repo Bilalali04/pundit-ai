@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 
 from src.agent.tools import (
+    find_match,
     get_match_events,
     get_player_match_stats,
     get_player_season_baseline,
@@ -24,7 +25,12 @@ SYSTEM_PROMPT = (
     "available (e.g. pass completion = passes_completed / passes_total, duel success = "
     "duels_won / duels_total), rather than reacting to the completed/successful count in "
     "isolation. A low completed count with a high total can still be a strong rate, and vice "
-    "versa - judge the rate, not just the raw number."
+    "versa - judge the rate, not just the raw number.\n\n"
+    "When you use find_match to look up a match_id from team names and it returns "
+    "'multiple_matches', do NOT pick one automatically. Stop and ask the user which specific "
+    "match they meant, listing each candidate's date and score so they can choose - only call "
+    "get_player_match_stats, get_match_events, or any other match-specific tool once you know "
+    "the exact match_id."
 )
 
 
@@ -41,6 +47,7 @@ def ask(question: str) -> str:
                 get_player_season_baseline,
                 get_match_events,
                 get_position_expectations,
+                find_match,
             ],
         ),
     )

@@ -1,7 +1,8 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from src.db.connection import SessionLocal
-from src.db.models import MatchEvent, Player, PlayerMatchStats, Team
+from src.db.models import Match, MatchEvent, Player, PlayerMatchStats, Team
+from src.scraping.name_matching import TEAM_ALIASES, normalize_name
 
 
 def get_player_match_stats(player_name: str, match_id: int) -> dict | None:
@@ -165,6 +166,106 @@ def get_position_expectations(position: str) -> dict | None:
             "avg_interceptions_per_match": round(avg_interceptions_per_match, 2),
             "duels_won_rate": round(duels_won_rate, 3) if duels_won_rate is not None else None,
             "pass_completion_rate": round(pass_completion_rate, 3) if pass_completion_rate is not None else None,
+        }
+    finally:
+        session.close()
+
+
+def _resolve_team(session, name: str) -> Team | None:
+    """Resolve a team name (possibly shorthand, e.g. "City" or "Man Utd") to a single Team row.
+
+    Returns None if no team matches, or if more than one team matches ambiguously (e.g. a
+    substring like "United" that could mean several clubs) - callers should treat both cases
+    as "couldn't resolve" rather than guessing.
+    """
+    all_teams = session.scalars(select(Team)).all()
+    normalized_input = normalize_name(name)
+
+    for team in all_teams:
+        if normalize_name(team.name) == normalized_input:
+            return team
+
+    aliased = TEAM_ALIASES.get(name) or next((k for k, v in TEAM_ALIASES.items() if v == name), None)
+    if aliased:
+        for team in all_teams:
+            if normalize_name(team.name) == normalize_name(aliased):
+                return team
+
+    candidates = [
+        team
+        for team in all_teams
+        if normalized_input in normalize_name(team.name) or normalize_name(team.name) in normalized_input
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+
+    return None
+
+
+def find_match(home_team: str, away_team: str) -> dict:
+    """Find the match_id(s) for a fixture between two named teams this season, regardless of
+    which one actually played at home - use this when the user names two teams but not a
+    match_id.
+
+    Team names can be shorthand or variants (e.g. "City", "Man Utd", "Spurs") - fuzzy matching
+    is applied. If the two teams played each other more than once this season (home and away
+    fixtures), all candidates are returned with dates so the correct one can be confirmed
+    before looking up stats or events.
+
+    Args:
+        home_team: One of the two team names, e.g. "Manchester City".
+        away_team: The other team name, e.g. "Arsenal".
+    """
+    session = SessionLocal()
+    try:
+        team_a = _resolve_team(session, home_team)
+        team_b = _resolve_team(session, away_team)
+
+        if team_a is None or team_b is None:
+            unresolved = [name for name, team in [(home_team, team_a), (away_team, team_b)] if team is None]
+            return {
+                "status": "team_not_found",
+                "message": f"Could not resolve team name(s): {', '.join(unresolved)}.",
+            }
+
+        matches = session.scalars(
+            select(Match)
+            .where(
+                or_(
+                    (Match.home_team_id == team_a.team_id) & (Match.away_team_id == team_b.team_id),
+                    (Match.home_team_id == team_b.team_id) & (Match.away_team_id == team_a.team_id),
+                )
+            )
+            .order_by(Match.match_date)
+        ).all()
+
+        if not matches:
+            return {
+                "status": "no_match_found",
+                "message": f"No match found between {team_a.name} and {team_b.name} this season.",
+            }
+
+        def _summarize(m: Match) -> dict:
+            home = session.get(Team, m.home_team_id)
+            away = session.get(Team, m.away_team_id)
+            return {
+                "match_id": m.match_id,
+                "date": m.match_date.isoformat(),
+                "home_team": home.name,
+                "away_team": away.name,
+                "score": f"{m.home_score}-{m.away_score}" if m.home_score is not None else None,
+            }
+
+        if len(matches) == 1:
+            return {"status": "found", **_summarize(matches[0])}
+
+        return {
+            "status": "multiple_matches",
+            "message": (
+                f"{team_a.name} and {team_b.name} played each other {len(matches)} times this "
+                "season - specify which match_id to use."
+            ),
+            "candidates": [_summarize(m) for m in matches],
         }
     finally:
         session.close()

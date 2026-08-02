@@ -6,6 +6,7 @@ from google.genai import types
 
 from src.agent.agent import SYSTEM_PROMPT
 from src.agent.tools import (
+    find_match,
     get_match_events,
     get_player_match_stats,
     get_player_season_baseline,
@@ -26,6 +27,7 @@ def main():
                 get_player_season_baseline,
                 get_match_events,
                 get_position_expectations,
+                find_match,
             ],
         ),
     )
