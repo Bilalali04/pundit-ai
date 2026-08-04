@@ -1,12 +1,14 @@
 """Daily Premier League ingestion.
 
-Finds matches that have been played but aren't yet in the database, then ingests player
-stats and match events for each - see src/ingestion/ingest_daily.py for the actual logic,
-which reuses the same functions ingest_season.py and ingest_match.py already prove out.
+Finds matches that have been played but don't yet have match_events ingested, and ingests
+events for each - see src/ingestion/ingest_daily.py for the actual logic. Deliberately
+API-Football-only: FBref's player-stats scraping can't run reliably from this environment
+(hits FBref's CAPTCHA gate every time on this Docker-hosted browser session), so that piece
+is left to be run manually from the venv via ingest_season.py instead.
 
-The heavy imports (soccerdata, sqlalchemy, requests, etc.) are deferred to inside the task
-callable rather than module scope, so DAG parsing stays fast and doesn't require those
-packages to be installed just to list this DAG - only actually running the task does.
+The heavy imports (sqlalchemy, requests, etc.) are deferred to inside the task callable
+rather than module scope, so DAG parsing stays fast and doesn't require those packages to be
+installed just to list this DAG - only actually running the task does.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ if PUNDIT_AI_ROOT not in sys.path:
 
 @dag(
     dag_id="daily_premier_league_ingestion",
-    description="Find and ingest any newly-played Premier League matches (player stats + match events)",
+    description="Find and ingest match events for any newly-played Premier League matches (API-Football only, no FBref)",
     schedule="0 6 * * *",
     start_date=datetime(2025, 8, 1),
     catchup=False,
