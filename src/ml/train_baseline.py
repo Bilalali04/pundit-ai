@@ -11,7 +11,7 @@ LABEL_TO_ID = {"H": 0, "D": 1, "A": 2}
 ID_TO_LABEL = {v: k for k, v in LABEL_TO_ID.items()}
 
 
-def train_baseline():
+def train_baseline(draw_weight_multiplier: float = 1.0):
     """First baseline XGBoost 3-class classifier for match outcome (H/D/A) - default
     hyperparameters, no tuning, just a real first result to see where we're starting from.
 
@@ -21,6 +21,12 @@ def train_baseline():
     sample_weight computed on the training set only (test set stays at its natural,
     unweighted distribution, since evaluation should reflect the real class balance the
     model will actually face) - not by ignoring the imbalance.
+
+    draw_weight_multiplier: applied on top of the automatic "balanced" weight, to the draw
+    class only (e.g. 1.5 or 2.0), to test whether manually pushing harder on draws recovers
+    draw performance that other features (home advantage) have eaten into - see
+    draw_weight_sweep.py for the comparison this is meant to support. 1.0 = pure balanced
+    weighting, unchanged from the original baseline.
     """
     train_df, test_df, train_seasons, test_seasons = time_based_split()
 
@@ -30,6 +36,9 @@ def train_baseline():
     y_test = test_df[TARGET_COLUMN].map(LABEL_TO_ID)
 
     sample_weight = compute_sample_weight(class_weight="balanced", y=y_train)
+    if draw_weight_multiplier != 1.0:
+        sample_weight = sample_weight.copy()
+        sample_weight[y_train.to_numpy() == LABEL_TO_ID["D"]] *= draw_weight_multiplier
 
     model = XGBClassifier(objective="multi:softmax", num_class=3, eval_metric="mlogloss", random_state=42)
     model.fit(X_train, y_train, sample_weight=sample_weight)
