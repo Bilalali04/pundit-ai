@@ -7,3 +7,5 @@ pandas
 python-dotenv
 soccerdata
 google-genai
+xgboost
+scikit-learn
