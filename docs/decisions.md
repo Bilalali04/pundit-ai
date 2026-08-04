@@ -79,6 +79,16 @@ Some sub-fields (`shots.on`, `tackles.blocks`, `tackles.interceptions`, `key_pas
 
 ---
 
+## Airflow automation: FBref player-stats ingestion excluded from the Docker path
+
+**Decision:** The daily Airflow DAG (running in Docker) automates only the API-Football-based match_events ingestion. FBref-dependent player-stats ingestion remains a manual process run from the local venv, where it has worked reliably throughout the project.
+
+**Reasoning:** FBref-dependent ingestion could not be reliably automated via the Docker-based Airflow setup, due to FBref's bot detection treating the container's fresh, unestablished network path with more suspicion than the host machine's already-established browsing pattern - confirmed via multiple clean test runs, not a code/infra defect. Every Docker-based attempt failed on the very first FBref request, before any session/cookies could be established, so a session-persistence approach wasn't applicable either (nothing successful to persist).
+
+**Trade-off accepted:** The API-Football-based match_events ingestion carries no such risk and completed successfully end-to-end in Docker on the first genuinely clean run, so it's what the automated DAG handles. FBref-based player-stats ingestion stays manual (run from the venv, e.g. via ingest_season.py) rather than automated, since automating it in this environment isn't reliable.
+
+---
+
 ## Match events: built on API-Football only, 98.84% player-resolution rate
 
 **Decision:** match_events ingestion uses API-Football's /fixtures/events endpoint exclusively - no FBref involved, despite FBref also having a real events timeline (confirmed via its events_wrap div, cross-validated against API-Football's data with 100% agreement on a test match). API-Football was chosen since it's structured JSON with no scraping/CAPTCHA risk, and since both sources agreed exactly, there was no benefit to using both.
