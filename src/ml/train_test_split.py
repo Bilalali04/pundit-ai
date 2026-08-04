@@ -10,7 +10,7 @@ def _season_label(date: pd.Timestamp) -> str:
     return f"{start_year}-{start_year + 1}"
 
 
-def time_based_split(train_seasons: int = 6, **load_kwargs):
+def time_based_split(train_seasons: int = 6, keep_meta: bool = False, **load_kwargs):
     """Split the feature set into train/test by season rather than a random shuffle.
 
     Football form and Elo are time-dependent - a random split would let matches from,
@@ -19,6 +19,12 @@ def time_based_split(train_seasons: int = 6, **load_kwargs):
     entirely out of the training set.
 
     Trains on the earliest `train_seasons` seasons found in the data, tests on the rest.
+
+    keep_meta: keep MatchDate (and HomeTeam/AwayTeam, if the caller also passes
+    keep_teams=True) in the returned dataframes instead of dropping them - needed to identify
+    a specific real match for per-prediction explainability (see explain_prediction.py), not
+    for training itself. Default False preserves the original behavior exactly for existing
+    callers (train_baseline.py, draw_weight_sweep.py).
     """
     df = load_feature_set(keep_date=True, **load_kwargs)
     df["MatchDate"] = pd.to_datetime(df["MatchDate"])
@@ -28,8 +34,9 @@ def time_based_split(train_seasons: int = 6, **load_kwargs):
     train_season_labels = seasons_in_order[:train_seasons]
     test_season_labels = seasons_in_order[train_seasons:]
 
-    train_df = df[df["season"].isin(train_season_labels)].drop(columns=["MatchDate", "season"]).reset_index(drop=True)
-    test_df = df[df["season"].isin(test_season_labels)].drop(columns=["MatchDate", "season"]).reset_index(drop=True)
+    drop_cols = ["season"] if keep_meta else ["MatchDate", "season"]
+    train_df = df[df["season"].isin(train_season_labels)].drop(columns=drop_cols).reset_index(drop=True)
+    test_df = df[df["season"].isin(test_season_labels)].drop(columns=drop_cols).reset_index(drop=True)
 
     return train_df, test_df, train_season_labels, test_season_labels
 

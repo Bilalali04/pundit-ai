@@ -21,7 +21,7 @@ TARGET_COLUMN = "FTResult"
 TRAINING_DATA_PATH = "db/training_data/PL_last8seasons.csv"
 
 
-def load_feature_set(csv_path: str = TRAINING_DATA_PATH, keep_date: bool = False) -> pd.DataFrame:
+def load_feature_set(csv_path: str = TRAINING_DATA_PATH, keep_date: bool = False, keep_teams: bool = False) -> pd.DataFrame:
     """Load the V2 match-outcome feature set from the offline training CSV (see
     db/training_data/README.md - not the live database).
 
@@ -37,6 +37,10 @@ def load_feature_set(csv_path: str = TRAINING_DATA_PATH, keep_date: bool = False
 
     keep_date: also include MatchDate in the result - needed for a time-based train/test
     split (see train_test_split.py), not for training itself.
+
+    keep_teams: also include HomeTeam/AwayTeam - needed to identify a specific real match for
+    per-prediction explainability (see explain_prediction.py), not for training itself (both
+    training scripts select FEATURE_COLUMNS explicitly, so extra columns here are harmless).
     """
     raw = pd.read_csv(csv_path)
     raw["elo_diff"] = raw["HomeElo"] - raw["AwayElo"]
@@ -46,6 +50,8 @@ def load_feature_set(csv_path: str = TRAINING_DATA_PATH, keep_date: bool = False
     columns = FEATURE_COLUMNS + [TARGET_COLUMN]
     if keep_date:
         columns = ["MatchDate"] + columns
+    if keep_teams:
+        columns = ["HomeTeam", "AwayTeam"] + columns
 
     df = raw[columns].dropna(subset=FEATURE_COLUMNS + [TARGET_COLUMN])
     return df.reset_index(drop=True)

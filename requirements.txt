@@ -9,3 +9,4 @@ soccerdata
 google-genai
 xgboost
 scikit-learn
+shap
