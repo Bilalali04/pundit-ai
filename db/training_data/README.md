@@ -20,6 +20,13 @@ and Elo ratings from [ClubElo](https://www.clubelo.com/). Downloaded 2026-08-04.
   ~500 European clubs, twice-monthly snapshots). Columns are `date`, `club`, `country`, `elo`
   (lowercase in the actual file - the source repo's README documents them capitalized, which
   doesn't match the real CSV header).
+- **`PL_full_history.csv`** - the same source repo's `Matches.csv`, filtered to
+  `Division == 'E0'` but with no date cutoff (full 2000/01-2024/25 Premier League history,
+  9,410 rows, just `MatchDate`/`HomeTeam`/`AwayTeam`/`FTResult`). This is **not** part of the
+  train/test feature set - it exists solely as the lookup source for the head-to-head feature
+  (`src/ml/head_to_head.py`), so that early rows in `PL_last8seasons.csv` (e.g. the 2017-18
+  season) still get real prior-meeting history instead of being wrongly flagged as
+  first-ever fixtures just because the 8-season slice's own visible window starts there.
 
 ## Important caveat: the `C_*` columns are not raw data
 
