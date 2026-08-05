@@ -11,3 +11,5 @@ xgboost
 scikit-learn
 shap
 joblib
+fastapi
+uvicorn[standard]
