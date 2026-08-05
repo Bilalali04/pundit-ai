@@ -102,4 +102,13 @@ def ask(question: str) -> str:
 
 
 if __name__ == "__main__":
+    import sys
+
+    # Windows' default console codepage (cp1252/cp437) can't render non-ASCII characters
+    # Gemini's responses routinely contain (curly apostrophes, en-dashes) - force UTF-8 on
+    # stdout for this script's own output. Scoped to __main__ only, not module level, since
+    # agent.py is also imported as a library (e.g. by chat.py) where reconfiguring global
+    # stdout on import wouldn't be appropriate.
+    sys.stdout.reconfigure(encoding="utf-8")
+
     ask("Did Declan Rice play well in match_id 1?")
