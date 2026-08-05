@@ -67,6 +67,27 @@ Some sub-fields (`shots.on`, `tackles.blocks`, `tackles.interceptions`, `key_pas
 
 ---
 
+## Advanced stats (xG/xA/progressive passing/pressures): investigation fully closed
+
+After extensive, direct testing (not inference), player-level xG, xA, xAG, and progressive-passing data is confirmed unavailable from any legitimate, live, ongoing source for the current Premier League season. Full investigation trail:
+
+**Direct verification against FBref's live site (four separate checks):** match-level events, season-standard stats, season-shooting stats, and season-passing stats all confirmed to lack this data - checked via raw HTML inspection, not just library output, ruling out a soccerdata parsing bug.
+
+**Confirmed the data existed historically:** verified via eddwebster/football_analytics' archived 2021-22 scrape (356/356 Premier League rows populated with real xG/xA/progressive values). Testing 2022-23 on a genuine top-5 league (ruling out league tier as a confound) showed the same absence found in 2025-26, confirming this is a time-based gap, not a tier-based one.
+
+**Root cause, most likely:** FBref's data has gone through at least two provider transitions - a StatsBomb-to-StatsPerform switch around October 2022, and, per a dated March 2026 industry source, FBref "lost its Opta licence in January 2026." The second event is the more likely direct cause of the current, complete absence of licensed advanced-stat data on the live site.
+
+**Other sources evaluated and ruled out:**
+- Understat, FotMob, Sofascore: no legitimate access path (bot-detection bypass required, or explicit ToS prohibition)
+- Opta/Stats Perform, Hudl StatsBomb's full data platform: enterprise-only, B2B, contact-sales pricing not accessible to an individual/student project
+- jeffreyohene/kickR: confirmed to scrape the same live FBref pages already found empty - not an independent data source
+- Pappalardo/Wyscout academic dataset (Nature-published, legitimate): rich, human-tagged event data, but frozen at the 2017-18 season only
+- StatsBomb Open Data, SkillCorner Open Data, Metrica Sports Sample Data: all legitimate official releases, but each either covers a fixed historical/curated set of competitions unrelated to ongoing Premier League coverage, or (for SkillCorner/Metrica) provides raw tracking coordinates rather than usable stats, and covers only a handful of matches
+
+**Final scope decision, unchanged but now fully evidenced:** V1 does not include player-level xG/xA/progressive-passing for any current-season analysis. This is the ceiling for free, legitimate, live data access - not a gap left by insufficient effort. The Pappalardo dataset and StatsBomb Open Data remain documented as legitimate options for future V2 training enrichment or curated one-off demo matches, not for live pipeline use.
+
+---
+
 ## Ingestion pipeline: built and verified end-to-end
 
 **Decision:** Built src/ingestion/ingest_match.py, which pulls FBref (via soccerdata) and API-Football data for a match, aligns players using src/scraping/name_matching.py, and upserts into player_match_stats. Verified against two real matches (Man City vs Arsenal, Liverpool vs Man Utd) with actual database rows checked back, not just "insert succeeded" logs.
