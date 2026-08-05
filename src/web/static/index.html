@@ -3,101 +3,248 @@
 <head>
 <meta charset="UTF-8">
 <title>Pundit AI</title>
+<script>
+  // Set the theme attribute synchronously, before first paint, so there's no flash of the
+  // wrong theme while the rest of the page loads. Defaults to dark (per project preference)
+  // when nothing is stored yet.
+  (function () {
+    const stored = localStorage.getItem("pundit-ai-theme");
+    document.documentElement.setAttribute("data-theme", stored === "light" ? "light" : "dark");
+  })();
+</script>
 <style>
+  :root[data-theme="dark"] {
+    --bg: #14141f;
+    --header-bg: #1a1a2e;
+    --header-text: #f2f2f5;
+    --header-border: #2a2a40;
+    --messages-bg: #14141f;
+    --bubble-user-bg: #2563eb;
+    --bubble-user-text: #ffffff;
+    --bubble-agent-bg: #1f1f30;
+    --bubble-agent-text: #e8e8ee;
+    --bubble-agent-border: #2e2e45;
+    --bubble-pending-text: #8a8aa0;
+    --bubble-error-bg: #3a1a1a;
+    --bubble-error-text: #ff9d9d;
+    --bubble-error-border: #5c2626;
+    --input-bar-bg: #1a1a2e;
+    --input-bar-border: #2a2a40;
+    --input-bg: #24243a;
+    --input-text: #f2f2f5;
+    --input-border: #34344c;
+    --input-focus-border: #2563eb;
+    --input-placeholder: #74748c;
+    --button-bg: #2563eb;
+    --button-text: #ffffff;
+    --button-disabled-bg: #3a3a52;
+    --button-disabled-text: #8a8aa0;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --scrollbar-thumb: #34344c;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f5f5f7;
+    --header-bg: #1a1a2e;
+    --header-text: #ffffff;
+    --header-border: #1a1a2e;
+    --messages-bg: #f5f5f7;
+    --bubble-user-bg: #2563eb;
+    --bubble-user-text: #ffffff;
+    --bubble-agent-bg: #ffffff;
+    --bubble-agent-text: #1a1a2e;
+    --bubble-agent-border: #e0e0e6;
+    --bubble-pending-text: #999999;
+    --bubble-error-bg: #fee2e2;
+    --bubble-error-text: #991b1b;
+    --bubble-error-border: #fca5a5;
+    --input-bar-bg: #ffffff;
+    --input-bar-border: #e0e0e6;
+    --input-bg: #ffffff;
+    --input-text: #1a1a2e;
+    --input-border: #d0d0d6;
+    --input-focus-border: #2563eb;
+    --input-placeholder: #9a9aa8;
+    --button-bg: #2563eb;
+    --button-text: #ffffff;
+    --button-disabled-bg: #a0a0b0;
+    --button-disabled-text: #f0f0f2;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --scrollbar-thumb: #d0d0d6;
+  }
+
   * { box-sizing: border-box; }
+
   body {
     margin: 0;
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: #f5f5f7;
+    background: var(--bg);
     height: 100vh;
     display: flex;
     flex-direction: column;
+    transition: background-color 0.2s ease;
   }
+
   header {
-    padding: 14px 20px;
-    background: #1a1a2e;
-    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    background: var(--header-bg);
+    color: var(--header-text);
+    border-bottom: 1px solid var(--header-border);
+    box-shadow: var(--shadow);
+    z-index: 1;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  header .title {
     font-weight: 600;
     font-size: 16px;
+    letter-spacing: 0.01em;
   }
+
+  #theme-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--header-text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+  }
+
+  #theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.16);
+    transform: scale(1.05);
+  }
+
   #messages {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 24px 20px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
+    background: var(--messages-bg);
+    transition: background-color 0.2s ease;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
+
+  #messages::-webkit-scrollbar {
+    width: 8px;
+  }
+  #messages::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 8px;
+  }
+
   .msg {
     max-width: 70%;
-    padding: 10px 14px;
-    border-radius: 14px;
-    line-height: 1.4;
+    padding: 11px 16px;
+    border-radius: 16px;
+    line-height: 1.5;
+    font-size: 14.5px;
     white-space: pre-wrap;
     word-wrap: break-word;
+    box-shadow: var(--shadow);
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
+
   .msg.user {
     align-self: flex-end;
-    background: #2563eb;
-    color: #fff;
+    background: var(--bubble-user-bg);
+    color: var(--bubble-user-text);
     border-bottom-right-radius: 4px;
   }
+
   .msg.agent {
     align-self: flex-start;
-    background: #fff;
-    color: #1a1a2e;
-    border: 1px solid #e0e0e6;
+    background: var(--bubble-agent-bg);
+    color: var(--bubble-agent-text);
+    border: 1px solid var(--bubble-agent-border);
     border-bottom-left-radius: 4px;
   }
+
   .msg.pending {
     align-self: flex-start;
-    background: #fff;
-    border: 1px solid #e0e0e6;
-    color: #999;
+    background: var(--bubble-agent-bg);
+    border: 1px solid var(--bubble-agent-border);
+    color: var(--bubble-pending-text);
     font-style: italic;
+    border-bottom-left-radius: 4px;
   }
+
   .msg.error {
     align-self: center;
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fca5a5;
+    background: var(--bubble-error-bg);
+    color: var(--bubble-error-text);
+    border: 1px solid var(--bubble-error-border);
   }
+
   #input-bar {
     display: flex;
     gap: 10px;
-    padding: 14px 20px;
-    background: #fff;
-    border-top: 1px solid #e0e0e6;
+    padding: 16px 20px;
+    background: var(--input-bar-bg);
+    border-top: 1px solid var(--input-bar-border);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
   }
+
   #input-bar input {
     flex: 1;
-    padding: 10px 14px;
-    border: 1px solid #d0d0d6;
-    border-radius: 20px;
-    font-size: 14px;
+    padding: 11px 16px;
+    border: 1px solid var(--input-border);
+    border-radius: 22px;
+    font-size: 14.5px;
     outline: none;
+    background: var(--input-bg);
+    color: var(--input-text);
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.15s ease;
   }
+
+  #input-bar input::placeholder {
+    color: var(--input-placeholder);
+  }
+
   #input-bar input:focus {
-    border-color: #2563eb;
+    border-color: var(--input-focus-border);
   }
+
   #input-bar button {
-    padding: 10px 20px;
+    padding: 11px 22px;
     border: none;
-    border-radius: 20px;
-    background: #2563eb;
-    color: #fff;
-    font-size: 14px;
+    border-radius: 22px;
+    background: var(--button-bg);
+    color: var(--button-text);
+    font-size: 14.5px;
     font-weight: 600;
     cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
   }
+
+  #input-bar button:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
   #input-bar button:disabled {
-    background: #a0a0b0;
+    background: var(--button-disabled-bg);
+    color: var(--button-disabled-text);
     cursor: not-allowed;
   }
 </style>
 </head>
 <body>
-<header>Pundit AI - football analyst</header>
+<header>
+  <span class="title">Pundit AI - football analyst</span>
+  <button id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode"></button>
+</header>
 <div id="messages"></div>
 <div id="input-bar">
   <input id="input" type="text" placeholder="Ask about a player's match performance..." autocomplete="off">
@@ -113,6 +260,7 @@
   const messagesEl = document.getElementById("messages");
   const inputEl = document.getElementById("input");
   const sendBtn = document.getElementById("send");
+  const themeToggleBtn = document.getElementById("theme-toggle");
 
   function addMessage(text, cssClass) {
     const div = document.createElement("div");
@@ -163,6 +311,26 @@
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter") sendMessage();
   });
+
+  // Theme toggle: reflects the *current* theme as an icon (sun shown in dark mode, meaning
+  // "switch to light"; moon shown in light mode, meaning "switch to dark"), persisted to
+  // localStorage so it survives a reload (read synchronously in <head>, before first paint).
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  }
+
+  function updateToggleIcon() {
+    themeToggleBtn.textContent = currentTheme() === "dark" ? "☀️" : "🌙";
+  }
+
+  themeToggleBtn.addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("pundit-ai-theme", next);
+    updateToggleIcon();
+  });
+
+  updateToggleIcon();
 </script>
 </body>
 </html>
