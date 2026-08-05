@@ -1,11 +1,15 @@
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src.agent.chat import create_chat_session
 
 app = FastAPI(title="Pundit AI Chat API")
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 # In-memory session store: session_id -> (client, chat). Both must be kept alive together -
 # the Chat object depends on its parent Client's underlying HTTP client internally but
@@ -31,6 +35,11 @@ class ChatResponse(BaseModel):
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.post("/chat", response_model=ChatResponse)
