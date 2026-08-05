@@ -203,11 +203,16 @@ TEAM_ALIASES = {
 }
 
 
-def match_team_name(fbref_name: str, api_team_names, match_id: str | None = None) -> str | None:
+def match_team_name(fbref_name: str, api_team_names, match_id: str | None = None, aliases: dict = TEAM_ALIASES) -> str | None:
     """Match an FBref team name against a collection of API-Football team names.
 
-    Returns the matching API-Football name, or None if no match was found
-    (logged as a warning so it can be reviewed and added to TEAM_ALIASES).
+    aliases defaults to the live-pipeline TEAM_ALIASES table above; pass a different dict
+    (e.g. src.ml.team_names.OFFLINE_TEAM_ALIASES, or a combination) to resolve names against
+    a different naming convention entirely - see src/ml/team_names.py for why that's a
+    separate dict rather than an extension of TEAM_ALIASES itself.
+
+    Returns the matching name from api_team_names, or None if no match was found (logged as
+    a warning so it can be reviewed and added to the aliases table in use).
     """
     if fbref_name in api_team_names:
         return fbref_name
@@ -218,7 +223,7 @@ def match_team_name(fbref_name: str, api_team_names, match_id: str | None = None
     if normalized_fbref in normalized_lookup:
         return normalized_lookup[normalized_fbref]
 
-    aliased = TEAM_ALIASES.get(fbref_name)
+    aliased = aliases.get(fbref_name)
     if aliased and aliased in api_team_names:
         return aliased
 

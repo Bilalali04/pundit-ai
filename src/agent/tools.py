@@ -5,7 +5,7 @@ from sqlalchemy import or_, select
 
 from src.db.connection import SessionLocal
 from src.db.models import Match, MatchEvent, Player, PlayerMatchStats, Team
-from src.scraping.name_matching import TEAM_ALIASES, normalize_name
+from src.scraping.name_matching import TEAM_ALIASES, match_team_name, normalize_name
 
 SERP_API_URL = "https://serpapi.com/search"
 
@@ -382,3 +382,65 @@ def search_web(query: str) -> dict:
     ]
 
     return {"query": query, "ai_overview": ai_overview_text, "results": results}
+
+
+def predict_match_outcome(home_team: str, away_team: str) -> dict:
+    """Predict the outcome of a match between two Premier League teams using the V2 XGBoost
+    model (Elo, recent form, head-to-head, and home-advantage features - see src/ml/). This
+    is a genuine prediction for a hypothetical or upcoming matchup, computed from the offline
+    training data (db/training_data/ - not the live database), not a lookup of a real result.
+
+    Team names can be given in full canonical form (e.g. "Manchester City"), matching every
+    other agent tool's convention, or the offline dataset's own short forms (e.g. "Man City")
+    - both resolve to the same team (see src/ml/team_names.py).
+
+    Note: this retrains the model on each call rather than using a cached one, so it is slow
+    (tens of seconds) - there is no persisted model artifact yet.
+
+    Args:
+        home_team: The home team's name, e.g. "Manchester City" or "Man City".
+        away_team: The away team's name, e.g. "Arsenal".
+    """
+    import pandas as pd
+
+    from src.ml.explain_prediction import build_and_explain_matchup, train_for_explanation
+    from src.ml.prepare_features import TRAINING_DATA_PATH
+    from src.ml.team_names import OFFLINE_TEAM_ALIASES
+
+    training_data = pd.read_csv(TRAINING_DATA_PATH)
+    known_teams = sorted(set(training_data["HomeTeam"]) | set(training_data["AwayTeam"]))
+    combined_aliases = {**TEAM_ALIASES, **OFFLINE_TEAM_ALIASES}
+
+    resolved_home = match_team_name(home_team, known_teams, aliases=combined_aliases)
+    resolved_away = match_team_name(away_team, known_teams, aliases=combined_aliases)
+    if resolved_home is None or resolved_away is None:
+        unresolved = [name for name, resolved in [(home_team, resolved_home), (away_team, resolved_away)] if resolved is None]
+        return {
+            "status": "team_not_found",
+            "message": f"Could not resolve team name(s): {', '.join(unresolved)}.",
+        }
+
+    model, _, _ = train_for_explanation()
+
+    try:
+        result = build_and_explain_matchup(model, resolved_home, resolved_away)
+    except ValueError as e:
+        return {"status": "no_elo_data", "message": str(e)}
+
+    outcome_names = {"H": "home_win", "D": "draw", "A": "away_win"}
+
+    return {
+        "status": "ok",
+        "home_team": resolved_home,
+        "away_team": resolved_away,
+        "predicted_outcome": outcome_names[result["predicted_label"]],
+        "probabilities": {
+            "home_win": round(result["probabilities"]["H"], 3),
+            "draw": round(result["probabilities"]["D"], 3),
+            "away_win": round(result["probabilities"]["A"], 3),
+        },
+        "top_contributing_factors": [
+            {"feature": feature, "value": round(value, 2), "shap_value": round(shap_value, 3)}
+            for feature, value, shap_value in result["contributions"][:3]
+        ],
+    }
