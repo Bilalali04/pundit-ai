@@ -1,4 +1,5 @@
 import os
+import sys
 
 from dotenv import load_dotenv
 from google import genai
@@ -15,6 +16,12 @@ from src.agent.tools import (
     predict_match_outcome,
     search_web,
 )
+
+# Windows' default console codepage (often cp1252/cp437) mangles non-ASCII characters
+# Gemini's responses routinely contain (curly apostrophes, en-dashes, etc.) - force UTF-8
+# on stdout regardless of the console's codepage rather than relying on it being set
+# externally (e.g. via PYTHONIOENCODING or `chcp 65001`).
+sys.stdout.reconfigure(encoding="utf-8")
 
 load_dotenv()
 
