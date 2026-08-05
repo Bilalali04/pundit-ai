@@ -7,7 +7,7 @@ FULL_HISTORY_PATH = "db/training_data/PL_full_history.csv"
 NEUTRAL_H2H_POINTS = 1.5
 
 
-def _points_for(result: str, side: str) -> int:
+def points_for(result: str, side: str) -> int:
     """Points earned by the given side ('home' or 'away') of a historical match."""
     if result == "D":
         return 1
@@ -66,7 +66,7 @@ def compute_h2h_features(matches: pd.DataFrame, history_path: str = FULL_HISTORY
             continue
 
         points = [
-            _points_for(result, "home" if h == home else "away")
+            points_for(result, "home" if h == home else "away")
             for h, result in zip(prior["HomeTeam"], prior["FTResult"])
         ]
         h2h_avg.append(sum(points) / len(points))
