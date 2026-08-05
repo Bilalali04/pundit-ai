@@ -10,3 +10,4 @@ google-genai
 xgboost
 scikit-learn
 shap
+joblib

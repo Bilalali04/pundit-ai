@@ -394,8 +394,10 @@ def predict_match_outcome(home_team: str, away_team: str) -> dict:
     other agent tool's convention, or the offline dataset's own short forms (e.g. "Man City")
     - both resolve to the same team (see src/ml/team_names.py).
 
-    Note: this retrains the model on each call rather than using a cached one, so it is slow
-    (tens of seconds) - there is no persisted model artifact yet.
+    Note: the model is trained once and cached to disk (src/ml/models/) rather than retrained
+    on each call - the first call after a cache miss (e.g. the very first call ever, or after
+    deleting the cache) takes tens of seconds; every call after that loads the cached model
+    and is fast.
 
     Args:
         home_team: The home team's name, e.g. "Manchester City" or "Man City".
@@ -403,7 +405,7 @@ def predict_match_outcome(home_team: str, away_team: str) -> dict:
     """
     import pandas as pd
 
-    from src.ml.explain_prediction import build_and_explain_matchup, train_for_explanation
+    from src.ml.explain_prediction import build_and_explain_matchup, get_or_train_model
     from src.ml.prepare_features import TRAINING_DATA_PATH
     from src.ml.team_names import OFFLINE_TEAM_ALIASES
 
@@ -420,10 +422,10 @@ def predict_match_outcome(home_team: str, away_team: str) -> dict:
             "message": f"Could not resolve team name(s): {', '.join(unresolved)}.",
         }
 
-    model, _, _ = train_for_explanation()
+    model, explainer = get_or_train_model()
 
     try:
-        result = build_and_explain_matchup(model, resolved_home, resolved_away)
+        result = build_and_explain_matchup(model, resolved_home, resolved_away, explainer=explainer)
     except ValueError as e:
         return {"status": "no_elo_data", "message": str(e)}
 

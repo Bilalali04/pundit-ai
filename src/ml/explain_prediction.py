@@ -1,3 +1,6 @@
+import os
+
+import joblib
 import pandas as pd
 import shap
 from sklearn.utils.class_weight import compute_sample_weight
@@ -10,6 +13,33 @@ from src.ml.home_advantage import compute_home_advantage_features
 from src.ml.prepare_features import FEATURE_COLUMNS, TARGET_COLUMN
 from src.ml.train_baseline import ID_TO_LABEL, LABEL_TO_ID
 from src.ml.train_test_split import time_based_split
+
+MODEL_DIR = "src/ml/models"
+MODEL_PATH = os.path.join(MODEL_DIR, "xgb_baseline.pkl")
+EXPLAINER_PATH = os.path.join(MODEL_DIR, "xgb_baseline_explainer.pkl")
+
+
+def get_or_train_model(model_path: str = MODEL_PATH, explainer_path: str = EXPLAINER_PATH, force_retrain: bool = False):
+    """Load the persisted baseline model + SHAP explainer from disk if both exist, otherwise
+    train fresh (via train_for_explanation - the same feature engineering + fit as
+    train_baseline.py) and persist them for next time.
+
+    Training isn't just the XGBoost fit - it also recomputes h2h and home-advantage features
+    across ~3000 training rows (a full-history scan per row), which is the more expensive
+    part. Caching the trained model means predict_match_outcome (src/agent/tools.py) skips
+    both on every call after the first, rather than repeating a 30-60s retrain each time.
+    """
+    if not force_retrain and os.path.exists(model_path) and os.path.exists(explainer_path):
+        return joblib.load(model_path), joblib.load(explainer_path)
+
+    model, _, _ = train_for_explanation()
+    explainer = shap.TreeExplainer(model)
+
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    joblib.dump(model, model_path)
+    joblib.dump(explainer, explainer_path)
+
+    return model, explainer
 
 
 def train_for_explanation():
@@ -32,17 +62,21 @@ def train_for_explanation():
     return model, train_df, test_df
 
 
-def _explain_row(model, X_row: pd.DataFrame) -> dict:
+def _explain_row(model, X_row: pd.DataFrame, explainer=None) -> dict:
     """Shared core: given a trained model and a single row of FEATURE_COLUMNS, return the
     prediction, probabilities, XGBoost's global feature importance, and this row's own SHAP
     breakdown - used both for explaining a real test-set match (explain_match) and a
     hypothetical new matchup (build_and_explain_matchup).
+
+    Pass a pre-built explainer (e.g. from get_or_train_model) to skip reconstructing it;
+    otherwise one is built fresh from `model` each call.
     """
     proba = model.predict_proba(X_row)[0]
     predicted_id = int(proba.argmax())
     predicted_label = ID_TO_LABEL[predicted_id]
 
-    explainer = shap.TreeExplainer(model)
+    if explainer is None:
+        explainer = shap.TreeExplainer(model)
     shap_values = explainer(X_row)  # shape: (1, n_features, n_classes)
 
     # Explain the class the model actually predicted, not always e.g. "H" - the point is to
@@ -70,7 +104,7 @@ def _explain_row(model, X_row: pd.DataFrame) -> dict:
     }
 
 
-def explain_match(model, test_df, match_index: int) -> dict:
+def explain_match(model, test_df, match_index: int, explainer=None) -> dict:
     """Explain one specific REAL test-set match - predicted outcome + probabilities, XGBoost's
     global feature importance (for context - which features matter most across all
     predictions), and a SHAP breakdown of exactly this match (which features pushed THIS
@@ -82,7 +116,7 @@ def explain_match(model, test_df, match_index: int) -> dict:
     row = test_df.iloc[[match_index]]
     X_row = row[FEATURE_COLUMNS]
 
-    result = _explain_row(model, X_row)
+    result = _explain_row(model, X_row, explainer=explainer)
     result["home_team"] = row["HomeTeam"].iloc[0]
     result["away_team"] = row["AwayTeam"].iloc[0]
     result["match_date"] = row["MatchDate"].iloc[0]
@@ -130,13 +164,13 @@ def build_matchup_features(home_team: str, away_team: str, reference_date=None) 
     return row[FEATURE_COLUMNS]
 
 
-def build_and_explain_matchup(model, home_team: str, away_team: str, reference_date=None) -> dict:
+def build_and_explain_matchup(model, home_team: str, away_team: str, reference_date=None, explainer=None) -> dict:
     """Same explanation as explain_match(), but for a hypothetical matchup built fresh from
     current data rather than a specific row already in the test set. No actual_label, since
     there's no real outcome yet to compare against.
     """
     X_row = build_matchup_features(home_team, away_team, reference_date)
-    result = _explain_row(model, X_row)
+    result = _explain_row(model, X_row, explainer=explainer)
     result["home_team"] = home_team
     result["away_team"] = away_team
     return result
