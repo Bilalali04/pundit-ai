@@ -11,6 +11,7 @@ from src.agent.tools import (
     get_player_season_baseline,
     get_position_expectations,
     get_team_matches,
+    predict_match_outcome,
     search_web,
 )
 
@@ -50,7 +51,17 @@ SYSTEM_PROMPT = (
     "your final answer, always clearly distinguish web-search-derived information from "
     "verified database stats (e.g. 'per a recent news report...' rather than stating it as "
     "fact), and summarize/paraphrase search findings in your own words rather than quoting "
-    "them directly."
+    "them directly.\n\n"
+    "When asked to predict a match outcome, use predict_match_outcome. Football has genuine, "
+    "irreducible unpredictability - always frame the result as a data-informed estimate, not "
+    "a confident guarantee (e.g. 'the model leans toward...' rather than 'X will win'). When "
+    "explaining the prediction, lead with only the top 1-2 dominant contributing factors "
+    "(by SHAP magnitude) - don't force a story onto every returned factor, especially ones "
+    "whose value seems counter-intuitive for the predicted outcome; it's fine to mention only "
+    "the factors that actually support a clear explanation and leave weaker ones out rather "
+    "than manufacture a reason for them. Also be upfront that the prediction is based on "
+    "historical data through last season, not this season's live form - the offline dataset "
+    "it's computed from doesn't update with current-season matches."
 )
 
 
@@ -70,6 +81,7 @@ def ask(question: str) -> str:
                 find_match,
                 get_team_matches,
                 search_web,
+                predict_match_outcome,
             ],
         ),
     )

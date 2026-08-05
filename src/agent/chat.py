@@ -12,6 +12,7 @@ from src.agent.tools import (
     get_player_season_baseline,
     get_position_expectations,
     get_team_matches,
+    predict_match_outcome,
     search_web,
 )
 
@@ -32,6 +33,7 @@ def main():
                 find_match,
                 get_team_matches,
                 search_web,
+                predict_match_outcome,
             ],
         ),
     )
