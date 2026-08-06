@@ -14,63 +14,79 @@
 </script>
 <style>
   :root[data-theme="dark"] {
-    --bg: #14141f;
-    --header-bg: #1a1a2e;
-    --header-text: #f2f2f5;
-    --header-border: #2a2a40;
-    --messages-bg: #14141f;
-    --bubble-user-bg: #2563eb;
+    --bg: #0a1420;
+    --header-bg-start: #06231a;
+    --header-bg-end: #123a24;
+    --header-text: #f5efe0;
+    --header-subtitle: #c9d6cc;
+    --header-border: #d4af37;
+    --messages-bg: #0a1420;
+    --pitch-stripe: rgba(255, 255, 255, 0.025);
+    --bubble-user-bg-start: #1f7a3d;
+    --bubble-user-bg-end: #2d9c52;
     --bubble-user-text: #ffffff;
-    --bubble-agent-bg: #1f1f30;
-    --bubble-agent-text: #e8e8ee;
-    --bubble-agent-border: #2e2e45;
-    --bubble-pending-text: #8a8aa0;
+    --bubble-agent-bg: #12233a;
+    --bubble-agent-text: #e6ecf2;
+    --bubble-agent-border: #24406b;
+    --bubble-agent-accent: #d4af37;
+    --bubble-pending-text: #8a97ab;
     --bubble-error-bg: #3a1a1a;
     --bubble-error-text: #ff9d9d;
     --bubble-error-border: #5c2626;
-    --input-bar-bg: #1a1a2e;
-    --input-bar-border: #2a2a40;
-    --input-bg: #24243a;
+    --input-bar-bg: #0d1c2e;
+    --input-bar-border: #1c3350;
+    --input-bg: #142438;
     --input-text: #f2f2f5;
-    --input-border: #34344c;
-    --input-focus-border: #2563eb;
-    --input-placeholder: #74748c;
-    --button-bg: #2563eb;
+    --input-border: #26436a;
+    --input-focus-border: #d4af37;
+    --input-placeholder: #6f7f95;
+    --button-bg-start: #1f7a3d;
+    --button-bg-end: #2d9c52;
     --button-text: #ffffff;
-    --button-disabled-bg: #3a3a52;
-    --button-disabled-text: #8a8aa0;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    --scrollbar-thumb: #34344c;
+    --button-disabled-bg: #22344a;
+    --button-disabled-text: #6f7f95;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    --scrollbar-thumb: #24406b;
+    --brand-icon-bg: #1f7a3d;
+    --brand-icon-ring: #d4af37;
   }
 
   :root[data-theme="light"] {
-    --bg: #f5f5f7;
-    --header-bg: #1a1a2e;
+    --bg: #f3f7f2;
+    --header-bg-start: #0a3d24;
+    --header-bg-end: #1f7a3d;
     --header-text: #ffffff;
-    --header-border: #1a1a2e;
-    --messages-bg: #f5f5f7;
-    --bubble-user-bg: #2563eb;
+    --header-subtitle: #dff2e4;
+    --header-border: #d4af37;
+    --messages-bg: #f3f7f2;
+    --pitch-stripe: rgba(31, 122, 61, 0.035);
+    --bubble-user-bg-start: #2d9c52;
+    --bubble-user-bg-end: #1f7a3d;
     --bubble-user-text: #ffffff;
     --bubble-agent-bg: #ffffff;
-    --bubble-agent-text: #1a1a2e;
-    --bubble-agent-border: #e0e0e6;
-    --bubble-pending-text: #999999;
+    --bubble-agent-text: #142418;
+    --bubble-agent-border: #dbe6de;
+    --bubble-agent-accent: #c9a227;
+    --bubble-pending-text: #7c8a80;
     --bubble-error-bg: #fee2e2;
     --bubble-error-text: #991b1b;
     --bubble-error-border: #fca5a5;
     --input-bar-bg: #ffffff;
-    --input-bar-border: #e0e0e6;
+    --input-bar-border: #e1e8e2;
     --input-bg: #ffffff;
-    --input-text: #1a1a2e;
-    --input-border: #d0d0d6;
-    --input-focus-border: #2563eb;
-    --input-placeholder: #9a9aa8;
-    --button-bg: #2563eb;
+    --input-text: #142418;
+    --input-border: #cfe0d3;
+    --input-focus-border: #1f7a3d;
+    --input-placeholder: #93a396;
+    --button-bg-start: #2d9c52;
+    --button-bg-end: #1f7a3d;
     --button-text: #ffffff;
-    --button-disabled-bg: #a0a0b0;
-    --button-disabled-text: #f0f0f2;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    --scrollbar-thumb: #d0d0d6;
+    --button-disabled-bg: #b9c9bd;
+    --button-disabled-text: #f0f4f1;
+    --shadow: 0 2px 8px rgba(20, 60, 35, 0.12);
+    --scrollbar-thumb: #cfe0d3;
+    --brand-icon-bg: #1f7a3d;
+    --brand-icon-ring: #d4af37;
   }
 
   * { box-sizing: border-box; }
@@ -89,27 +105,66 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 22px;
-    background: var(--header-bg);
+    padding: 14px 22px;
+    background-image:
+      radial-gradient(160px circle at 10% 0%, rgba(255, 255, 255, 0.10), transparent 60%),
+      radial-gradient(200px circle at 90% 0%, rgba(255, 255, 255, 0.08), transparent 60%),
+      linear-gradient(135deg, var(--header-bg-start), var(--header-bg-end));
     color: var(--header-text);
-    border-bottom: 1px solid var(--header-border);
+    border-bottom: 2px solid var(--header-border);
     box-shadow: var(--shadow);
     z-index: 1;
     transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--brand-icon-bg);
+    border: 2px solid var(--brand-icon-ring);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+
   header .title {
-    font-weight: 600;
-    font-size: 16px;
-    letter-spacing: 0.01em;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  }
+
+  header .subtitle {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--header-subtitle);
+    font-weight: 500;
   }
 
   #theme-toggle {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    background: rgba(212, 175, 55, 0.1);
     color: var(--header-text);
     font-size: 16px;
     cursor: pointer;
@@ -120,7 +175,7 @@
   }
 
   #theme-toggle:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(212, 175, 55, 0.2);
     transform: scale(1.05);
   }
 
@@ -131,7 +186,14 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    background: var(--messages-bg);
+    background-color: var(--messages-bg);
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--pitch-stripe) 0,
+      var(--pitch-stripe) 48px,
+      transparent 48px,
+      transparent 96px
+    );
     transition: background-color 0.2s ease;
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -159,7 +221,7 @@
 
   .msg.user {
     align-self: flex-end;
-    background: var(--bubble-user-bg);
+    background-image: linear-gradient(135deg, var(--bubble-user-bg-start), var(--bubble-user-bg-end));
     color: var(--bubble-user-text);
     border-bottom-right-radius: 4px;
   }
@@ -169,6 +231,7 @@
     background: var(--bubble-agent-bg);
     color: var(--bubble-agent-text);
     border: 1px solid var(--bubble-agent-border);
+    border-left: 3px solid var(--bubble-agent-accent);
     border-bottom-left-radius: 4px;
   }
 
@@ -176,6 +239,7 @@
     align-self: flex-start;
     background: var(--bubble-agent-bg);
     border: 1px solid var(--bubble-agent-border);
+    border-left: 3px solid var(--bubble-agent-accent);
     color: var(--bubble-pending-text);
     font-style: italic;
     border-bottom-left-radius: 4px;
@@ -221,7 +285,7 @@
     padding: 11px 22px;
     border: none;
     border-radius: 22px;
-    background: var(--button-bg);
+    background-image: linear-gradient(135deg, var(--button-bg-start), var(--button-bg-end));
     color: var(--button-text);
     font-size: 14.5px;
     font-weight: 600;
@@ -234,7 +298,8 @@
   }
 
   #input-bar button:disabled {
-    background: var(--button-disabled-bg);
+    background-image: none;
+    background-color: var(--button-disabled-bg);
     color: var(--button-disabled-text);
     cursor: not-allowed;
   }
@@ -242,7 +307,13 @@
 </head>
 <body>
 <header>
-  <span class="title">Pundit AI - football analyst</span>
+  <div class="brand">
+    <span class="brand-icon">⚽</span>
+    <div class="brand-text">
+      <span class="title">Pundit AI</span>
+      <span class="subtitle">Your AI Football Analyst</span>
+    </div>
+  </div>
   <button id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode"></button>
 </header>
 <div id="messages"></div>
