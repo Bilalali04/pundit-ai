@@ -21,7 +21,7 @@
     --header-subtitle: #c9d6cc;
     --header-border: #d4af37;
     --messages-bg: #0a1420;
-    --pitch-stripe: rgba(255, 255, 255, 0.025);
+    --pitch-stripe: rgba(255, 255, 255, 0.012);
     --bubble-user-bg-start: #1f7a3d;
     --bubble-user-bg-end: #2d9c52;
     --bubble-user-text: #ffffff;
@@ -59,7 +59,7 @@
     --header-subtitle: #dff2e4;
     --header-border: #d4af37;
     --messages-bg: #f3f7f2;
-    --pitch-stripe: rgba(31, 122, 61, 0.035);
+    --pitch-stripe: rgba(31, 122, 61, 0.065);
     --bubble-user-bg-start: #2d9c52;
     --bubble-user-bg-end: #1f7a3d;
     --bubble-user-text: #ffffff;
@@ -189,10 +189,9 @@
     background-color: var(--messages-bg);
     background-image: repeating-linear-gradient(
       90deg,
-      var(--pitch-stripe) 0,
-      var(--pitch-stripe) 48px,
-      transparent 48px,
-      transparent 96px
+      transparent 0,
+      var(--pitch-stripe) 70px,
+      transparent 140px
     );
     transition: background-color 0.2s ease;
     scrollbar-width: thin;
@@ -205,6 +204,18 @@
   #messages::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
     border-radius: 8px;
+  }
+
+  #empty-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    color: var(--bubble-pending-text);
+    font-size: 14.5px;
+    transition: color 0.2s ease;
   }
 
   .msg {
@@ -316,7 +327,9 @@
   </div>
   <button id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode"></button>
 </header>
-<div id="messages"></div>
+<div id="messages">
+  <div id="empty-state">⚽ Ask me about a player's performance or get a match prediction!</div>
+</div>
 <div id="input-bar">
   <input id="input" type="text" placeholder="Ask about a player's match performance..." autocomplete="off">
   <button id="send">Send</button>
@@ -334,6 +347,9 @@
   const themeToggleBtn = document.getElementById("theme-toggle");
 
   function addMessage(text, cssClass) {
+    const emptyState = document.getElementById("empty-state");
+    if (emptyState) emptyState.remove();
+
     const div = document.createElement("div");
     div.className = "msg " + cssClass;
     div.textContent = text;
