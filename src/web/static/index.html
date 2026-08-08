@@ -159,6 +159,35 @@
     font-weight: 500;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #debug-toggle {
+    padding: 7px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    background: rgba(212, 175, 55, 0.1);
+    color: var(--header-text);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  #debug-toggle:hover {
+    background: rgba(212, 175, 55, 0.2);
+  }
+
+  #debug-toggle.active {
+    background: var(--brand-icon-bg);
+    border-color: var(--brand-icon-ring);
+    color: #ffffff;
+  }
+
   #theme-toggle {
     width: 36px;
     height: 36px;
@@ -263,6 +292,51 @@
     border: 1px solid var(--bubble-error-border);
   }
 
+  /* Trace elements are always in the DOM once a response has tool calls, but only shown
+     when debug mode is on - toggling debug mode reveals/hides every trace already on the
+     page, not just ones from messages sent after the toggle. */
+  .trace-details {
+    display: none;
+    margin-top: 10px;
+  }
+
+  body.debug-mode .trace-details {
+    display: block;
+  }
+
+  .trace-details summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bubble-agent-accent);
+    user-select: none;
+  }
+
+  .trace-entry {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+  }
+
+  .trace-call {
+    color: var(--bubble-agent-accent);
+    word-break: break-word;
+  }
+
+  .trace-result-label {
+    margin-top: 6px;
+    opacity: 0.65;
+  }
+
+  .trace-result {
+    margin: 4px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   #input-bar {
     display: flex;
     gap: 10px;
@@ -325,7 +399,10 @@
       <span class="subtitle">Your AI Football Analyst</span>
     </div>
   </div>
-  <button id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode"></button>
+  <div class="header-actions">
+    <button id="debug-toggle" title="Toggle debug mode" aria-pressed="false">🐞 Debug</button>
+    <button id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode"></button>
+  </div>
 </header>
 <div id="messages">
   <div id="empty-state">⚽ Ask me about a player's performance or get a match prediction!</div>
@@ -345,14 +422,60 @@
   const inputEl = document.getElementById("input");
   const sendBtn = document.getElementById("send");
   const themeToggleBtn = document.getElementById("theme-toggle");
+  const debugToggleBtn = document.getElementById("debug-toggle");
 
-  function addMessage(text, cssClass) {
+  // Builds the collapsible tool-call trace shown under an agent response - text content is
+  // set via textContent throughout (never innerHTML), since tool args/results are structured
+  // data from the backend, not markup meant to be rendered.
+  function buildTraceElement(trace) {
+    const details = document.createElement("details");
+    details.className = "trace-details";
+
+    const summary = document.createElement("summary");
+    summary.textContent = `🔧 Tool calls (${trace.length})`;
+    details.appendChild(summary);
+
+    trace.forEach((call) => {
+      const entry = document.createElement("div");
+      entry.className = "trace-entry";
+
+      const callLine = document.createElement("div");
+      callLine.className = "trace-call";
+      callLine.textContent = `${call.tool}(${JSON.stringify(call.args)})`;
+      entry.appendChild(callLine);
+
+      const resultLabel = document.createElement("div");
+      resultLabel.className = "trace-result-label";
+      resultLabel.textContent = "→ result:";
+      entry.appendChild(resultLabel);
+
+      const resultBody = document.createElement("pre");
+      resultBody.className = "trace-result";
+      resultBody.textContent = JSON.stringify(call.result, null, 2);
+      entry.appendChild(resultBody);
+
+      details.appendChild(entry);
+    });
+
+    return details;
+  }
+
+  function addMessage(text, cssClass, trace) {
     const emptyState = document.getElementById("empty-state");
     if (emptyState) emptyState.remove();
 
     const div = document.createElement("div");
     div.className = "msg " + cssClass;
-    div.textContent = text;
+
+    const textEl = document.createElement("div");
+    textEl.className = "msg-text";
+    textEl.textContent = text;
+    div.appendChild(textEl);
+
+    if (trace && trace.length > 0) {
+      div.appendChild(buildTraceElement(trace));
+    }
+
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return div;
@@ -383,7 +506,7 @@
       const data = await resp.json();
       sessionId = data.session_id;
       pending.remove();
-      addMessage(data.response, "agent");
+      addMessage(data.response, "agent", data.debug_trace);
     } catch (err) {
       pending.remove();
       addMessage("Something went wrong: " + err.message, "error");
@@ -418,6 +541,16 @@
   });
 
   updateToggleIcon();
+
+  // Debug mode: purely a CSS toggle (body.debug-mode) rather than a per-message flag, so
+  // switching it on reveals the trace on every agent message already on screen, not just
+  // ones sent after the toggle - each trace is always built and attached in addMessage(),
+  // just hidden by default via CSS until debug mode is active.
+  debugToggleBtn.addEventListener("click", () => {
+    const active = document.body.classList.toggle("debug-mode");
+    debugToggleBtn.classList.toggle("active", active);
+    debugToggleBtn.setAttribute("aria-pressed", String(active));
+  });
 </script>
 </body>
 </html>
