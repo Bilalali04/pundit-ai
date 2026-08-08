@@ -27,9 +27,46 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
 
 
+class ToolCallTrace(BaseModel):
+    tool: str
+    args: dict
+    result: dict | None = None
+
+
 class ChatResponse(BaseModel):
     session_id: str
     response: str
+    debug_trace: list[ToolCallTrace] = []
+
+
+def _extract_debug_trace(response) -> list[ToolCallTrace]:
+    """Pull the tool-call trace out of a Gemini response's automatic_function_calling_history -
+    same source agent.py's ask() prints to the terminal (call name/args, then the matching
+    result), just structured here instead of printed.
+
+    Calls and their responses are paired by FIFO order, not by matching a single "most recent
+    call" - Gemini can (and does, e.g. when asked to compare two players) issue multiple
+    function_call parts within a single model turn before any results come back (parallel tool
+    calling), so the naive "attach the next response to whichever call I saw last" approach
+    silently drops results for every call but the last one in a batch. function_response parts
+    don't carry a usable 'id' to pair on either (empirically None in this SDK version) - but
+    call order and response order both follow the order the calls were issued in, so a FIFO
+    queue pairs them correctly regardless of whether calls are sequential or parallel.
+    """
+    trace: list[ToolCallTrace] = []
+    pending_queue: list[ToolCallTrace] = []
+    for content in response.automatic_function_calling_history or []:
+        for part in content.parts:
+            if part.function_call:
+                entry = ToolCallTrace(
+                    tool=part.function_call.name,
+                    args=dict(part.function_call.args) if part.function_call.args else {},
+                )
+                trace.append(entry)
+                pending_queue.append(entry)
+            if part.function_response and pending_queue:
+                pending_queue.pop(0).result = part.function_response.response
+    return trace
 
 
 @app.get("/health")
@@ -59,4 +96,8 @@ def chat_endpoint(request: ChatRequest) -> ChatResponse:
     _client, chat = sessions[session_id]
     response = chat.send_message(request.message)
 
-    return ChatResponse(session_id=session_id, response=response.text)
+    return ChatResponse(
+        session_id=session_id,
+        response=response.text,
+        debug_trace=_extract_debug_trace(response),
+    )
